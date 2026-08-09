@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -53,6 +54,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ErrorResponse.validation(
                 HttpStatus.BAD_REQUEST.value(), "Bad Request",
                 "Certains champs sont invalides", request.getRequestURI(), champs));
+    }
+
+    /** Corps de requete illisible : JSON malforme, champ du mauvais type, etc. */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleMessageNotReadable(HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(ErrorResponse.of(
+                HttpStatus.BAD_REQUEST.value(), "Bad Request",
+                "Corps de requete illisible ou mal forme", request.getRequestURI()));
     }
 
     /** Identifiants incorrects : message volontairement non discriminant. */

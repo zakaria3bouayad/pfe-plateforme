@@ -4,6 +4,7 @@ import com.pfe.pfe_backend.security.JwtFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -70,6 +71,11 @@ public class SecurityConfig {
                             "/api/auth/refresh").permitAll()
                     .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                     .requestMatchers("/error").permitAll()
+
+                    // Referentiel en lecture seule : necessaire au formulaire d'inscription,
+                    // appele avant qu'un jeton n'existe. L'ecriture reste protegee par
+                    // @PreAuthorize sur les controleurs (EF-07).
+                    .requestMatchers(HttpMethod.GET, "/api/filieres", "/api/promotions").permitAll()
 
                     // --- routes reservees ---
                     .requestMatchers("/api/admin/**").hasRole("ADMINISTRATEUR")

@@ -45,4 +45,11 @@ public class Etudiant extends Utilisateur {
             nullable = false,
             foreignKey = @ForeignKey(name = "fk_etudiant_promotion"))
     private Promotion promotion;
+
+    /** Equipe de PFE. Nulle tant que l'etudiant n'en a rejoint ou cree aucune (EF-11). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "equipe_id",
+            foreignKey = @ForeignKey(name = "fk_etudiant_equipe"))
+    private Equipe equipe;
 }
