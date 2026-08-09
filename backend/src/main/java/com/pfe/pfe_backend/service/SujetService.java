@@ -32,6 +32,10 @@ public class SujetService {
     private static final Set<StatutSujet> STATUTS_MODIFIABLES =
             EnumSet.of(StatutSujet.PROPOSE, StatutSujet.A_CORRIGER);
 
+    /** Statuts qui ne comptent plus dans le quota d'un encadrant (EF-10). */
+    private static final Set<StatutSujet> STATUTS_INACTIFS =
+            EnumSet.of(StatutSujet.REJETE, StatutSujet.CLOTURE);
+
     private final SujetRepository sujetRepository;
     private final SuperviseurRepository superviseurRepository;
     private final FiliereRepository filiereRepository;
@@ -59,10 +63,24 @@ public class SujetService {
     @Transactional
     public SujetDto proposer(String emailEncadrant, SujetRequest requete) {
         Superviseur encadrant = trouverEncadrant(emailEncadrant);
+        String titre = requete.titre().trim();
+
+        if (sujetRepository.existsByEncadrantIdAndTitreIgnoreCaseAndStatutNot(
+                encadrant.getId(), titre, StatutSujet.REJETE)) {
+            throw BusinessException.conflit("Vous avez deja un sujet actif avec ce titre");
+        }
+
+        long sujetsActifs = sujetRepository.countByEncadrantIdAndStatutNotIn(
+                encadrant.getId(), STATUTS_INACTIFS);
+        if (sujetsActifs >= encadrant.getQuotaProjets()) {
+            throw BusinessException.conflit(
+                    "Vous avez atteint votre quota de sujets actifs (" + encadrant.getQuotaProjets() + ")");
+        }
+
         Filiere filiere = resoudreFiliere(requete.filiereId());
 
         Sujet sujet = Sujet.builder()
-                .titre(requete.titre().trim())
+                .titre(titre)
                 .description(requete.description().trim())
                 .motsCles(requete.motsCles())
                 .capaciteMax(requete.capaciteMax())
