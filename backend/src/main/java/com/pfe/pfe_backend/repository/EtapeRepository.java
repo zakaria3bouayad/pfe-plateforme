@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface EtapeRepository extends JpaRepository<Etape, Long> {
@@ -20,4 +21,16 @@ public interface EtapeRepository extends JpaRepository<Etape, Long> {
     List<Etape> findByStatutNotInAndDateEcheanceBefore(Collection<StatutEtape> statutsExclus, LocalDate date);
 
     long countByProjetIdAndStatut(Long projetId, StatutEtape statut);
+
+    // ------------------------------------------------------------ stats (Lot 3, bloc B)
+
+    long countByProjetId(Long projetId);
+
+    /** Prochain jalon non encore valide, pour le tableau de bord etudiant. */
+    Optional<Etape> findFirstByProjetIdAndStatutNotOrderByDateEcheanceAsc(Long projetId, StatutEtape statutExclu);
+
+    /** Tous jalons des projets encadres par un encadrant donne. */
+    long countByProjetEncadrantIdAndStatut(Long encadrantId, StatutEtape statut);
+
+    long countByStatut(StatutEtape statut);
 }

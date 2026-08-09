@@ -20,4 +20,7 @@ public interface ProjetRepository extends JpaRepository<Projet, Long> {
     List<Projet> findAllByOrderByDateAffectationDesc();
 
     long countByEncadrantIdAndStatut(Long encadrantId, StatutProjet statut);
+
+    /** Stats admin (Lot 3, bloc B). */
+    long countByStatut(StatutProjet statut);
 }

@@ -23,4 +23,10 @@ public interface SujetRepository extends JpaRepository<Sujet, Long> {
 
     /** Quota : nombre de sujets actifs (ni rejetes, ni clotures) d'un encadrant. */
     long countByEncadrantIdAndStatutNotIn(Long encadrantId, Collection<StatutSujet> statutsExclus);
+
+    // ------------------------------------------------------------ stats (Lot 3, bloc B)
+
+    long countByEncadrantIdAndStatutIn(Long encadrantId, Collection<StatutSujet> statuts);
+
+    long countByStatutIn(Collection<StatutSujet> statuts);
 }
