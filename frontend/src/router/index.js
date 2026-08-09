@@ -24,15 +24,45 @@ const routes = [
     meta: { roles: ['ETUDIANT'] },
   },
   {
+    path: '/etudiant/equipe',
+    name: 'etudiant-equipe',
+    component: () => import('@/views/EtudiantEquipeView.vue'),
+    meta: { roles: ['ETUDIANT'] },
+  },
+  {
+    path: '/etudiant/sujets',
+    name: 'etudiant-sujets',
+    component: () => import('@/views/EtudiantSujetsView.vue'),
+    meta: { roles: ['ETUDIANT'] },
+  },
+  {
+    path: '/etudiant/projet',
+    name: 'etudiant-projet',
+    component: () => import('@/views/EtudiantProjetView.vue'),
+    meta: { roles: ['ETUDIANT'] },
+  },
+  {
     path: '/encadrant',
     name: 'dashboard-encadrant',
     component: () => import('@/views/DashboardEncadrant.vue'),
     meta: { roles: ['ENCADRANT'] },
   },
   {
+    path: '/encadrant/sujets',
+    name: 'encadrant-sujets',
+    component: () => import('@/views/EncadrantSujetsView.vue'),
+    meta: { roles: ['ENCADRANT'] },
+  },
+  {
     path: '/admin',
     name: 'dashboard-admin',
     component: () => import('@/views/DashboardAdmin.vue'),
+    meta: { roles: ['ADMINISTRATEUR'] },
+  },
+  {
+    path: '/admin/sujets',
+    name: 'admin-sujets',
+    component: () => import('@/views/AdminSujetsView.vue'),
     meta: { roles: ['ADMINISTRATEUR'] },
   },
 

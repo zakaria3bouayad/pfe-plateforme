@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore'
 const auth = useAuthStore()
 
 const cartes = [
-  { titre: 'Mes sujets proposés', icone: 'mdi-lightbulb-on-outline', texte: 'Lot 2' },
+  { titre: 'Mes sujets proposés', icone: 'mdi-lightbulb-on-outline', route: '/encadrant/sujets' },
   { titre: 'Projets encadrés', icone: 'mdi-folder-multiple-outline', texte: 'Lot 3' },
   { titre: 'Jalons à valider', icone: 'mdi-check-decagram-outline', texte: 'Lot 3' },
   { titre: 'Livrables à commenter', icone: 'mdi-comment-text-outline', texte: 'Lot 4' },
@@ -22,11 +22,11 @@ const cartes = [
 
     <v-row>
       <v-col v-for="c in cartes" :key="c.titre" cols="12" sm="6" md="4">
-        <v-card variant="outlined" rounded="lg" class="h-100">
+        <v-card variant="outlined" rounded="lg" class="h-100" :to="c.route" :link="!!c.route" :hover="!!c.route">
           <v-card-item>
             <v-icon :icon="c.icone" size="32" color="teal-darken-2" />
             <v-card-title class="text-subtitle-1 mt-2">{{ c.titre }}</v-card-title>
-            <v-card-subtitle>Disponible au {{ c.texte }}</v-card-subtitle>
+            <v-card-subtitle>{{ c.route ? 'Ouvrir' : `Disponible au ${c.texte}` }}</v-card-subtitle>
           </v-card-item>
         </v-card>
       </v-col>

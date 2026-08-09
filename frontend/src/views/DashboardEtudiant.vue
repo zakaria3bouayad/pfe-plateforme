@@ -5,9 +5,9 @@ import { useAuthStore } from '@/stores/authStore'
 const auth = useAuthStore()
 
 const cartes = [
-  { titre: 'Mon projet', icone: 'mdi-folder-outline', texte: 'Lot 3' },
-  { titre: 'Sujets disponibles', icone: 'mdi-lightbulb-outline', texte: 'Lot 2' },
-  { titre: 'Mon équipe', icone: 'mdi-account-group-outline', texte: 'Lot 2' },
+  { titre: 'Mon projet', icone: 'mdi-folder-outline', route: '/etudiant/projet' },
+  { titre: 'Sujets disponibles', icone: 'mdi-lightbulb-outline', route: '/etudiant/sujets' },
+  { titre: 'Mon équipe', icone: 'mdi-account-group-outline', route: '/etudiant/equipe' },
   { titre: 'Documents', icone: 'mdi-file-document-outline', texte: 'Lot 4' },
   { titre: 'Messagerie', icone: 'mdi-forum-outline', texte: 'Lot 5' },
   { titre: 'Bibliothèque', icone: 'mdi-library-outline', texte: 'Lot 5' },
@@ -22,11 +22,11 @@ const cartes = [
 
     <v-row>
       <v-col v-for="c in cartes" :key="c.titre" cols="12" sm="6" md="4">
-        <v-card variant="outlined" rounded="lg" class="h-100">
+        <v-card variant="outlined" rounded="lg" class="h-100" :to="c.route" :link="!!c.route" :hover="!!c.route">
           <v-card-item>
             <v-icon :icon="c.icone" size="32" color="primary" />
             <v-card-title class="text-subtitle-1 mt-2">{{ c.titre }}</v-card-title>
-            <v-card-subtitle>Disponible au {{ c.texte }}</v-card-subtitle>
+            <v-card-subtitle>{{ c.route ? 'Ouvrir' : `Disponible au ${c.texte}` }}</v-card-subtitle>
           </v-card-item>
         </v-card>
       </v-col>
