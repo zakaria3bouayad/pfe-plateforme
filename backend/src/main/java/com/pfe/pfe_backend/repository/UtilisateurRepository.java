@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -29,4 +30,10 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
     Page<Utilisateur> findByActifTrue(Pageable pageable);
 
     long countByRole(Role role);
+
+    // ------------------------------------------------------------ gestion admin (EF-03)
+
+    List<Utilisateur> findAllByOrderByNomAscPrenomAsc();
+
+    List<Utilisateur> findByRoleOrderByNomAscPrenomAsc(Role role);
 }

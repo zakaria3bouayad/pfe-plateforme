@@ -78,6 +78,24 @@ const routes = [
     meta: { roles: ['ADMINISTRATEUR'] },
   },
   {
+    path: '/admin/projets',
+    name: 'admin-projets',
+    component: () => import('@/views/AdminProjetsView.vue'),
+    meta: { roles: ['ADMINISTRATEUR'] },
+  },
+  {
+    path: '/admin/utilisateurs',
+    name: 'admin-utilisateurs',
+    component: () => import('@/views/AdminUtilisateursView.vue'),
+    meta: { roles: ['ADMINISTRATEUR'] },
+  },
+  {
+    path: '/admin/referentiel',
+    name: 'admin-referentiel',
+    component: () => import('@/views/AdminReferentielView.vue'),
+    meta: { roles: ['ADMINISTRATEUR'] },
+  },
+  {
     path: '/admin/stats',
     name: 'admin-stats',
     component: () => import('@/views/AdminStatsView.vue'),

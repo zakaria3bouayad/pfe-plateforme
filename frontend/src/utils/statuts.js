@@ -39,3 +39,39 @@ export const COULEURS_STATUT_ETAPE = {
   VALIDEE: 'green',
   EN_RETARD: 'red',
 }
+
+/** Cycle de vie d'un projet (figure 12 de la conception UML). */
+export const LIBELLES_STATUT_PROJET = {
+  BROUILLON: 'Brouillon',
+  SOUMIS: 'Soumis',
+  EN_COURS: 'En cours',
+  EN_REVISION: 'En révision',
+  SOUTENU: 'Soutenu',
+  ARCHIVE: 'Archivé',
+  SUSPENDU: 'Suspendu',
+  REJETE: 'Rejeté',
+}
+
+export const COULEURS_STATUT_PROJET = {
+  BROUILLON: 'grey',
+  SOUMIS: 'blue',
+  EN_COURS: 'teal-darken-2',
+  EN_REVISION: 'orange',
+  SOUTENU: 'green',
+  ARCHIVE: 'grey-darken-2',
+  SUSPENDU: 'orange-darken-3',
+  REJETE: 'red',
+}
+
+/** Roles applicatifs (gestion des comptes par l'admin, EF-03). */
+export const LIBELLES_ROLE = {
+  ETUDIANT: 'Étudiant',
+  ENCADRANT: 'Encadrant',
+  ADMINISTRATEUR: 'Administrateur',
+}
+
+export const COULEURS_ROLE = {
+  ETUDIANT: 'blue',
+  ENCADRANT: 'teal-darken-2',
+  ADMINISTRATEUR: 'deep-purple-darken-2',
+}

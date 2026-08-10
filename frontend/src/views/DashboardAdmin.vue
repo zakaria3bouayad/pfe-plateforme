@@ -5,10 +5,10 @@ import { useAuthStore } from '@/stores/authStore'
 const auth = useAuthStore()
 
 const cartes = [
-  { titre: 'Utilisateurs', icone: 'mdi-account-multiple-outline', texte: 'Lot 2' },
-  { titre: 'Filières et promotions', icone: 'mdi-school-outline', texte: 'Lot 2' },
+  { titre: 'Utilisateurs', icone: 'mdi-account-multiple-outline', route: '/admin/utilisateurs' },
+  { titre: 'Filières et promotions', icone: 'mdi-school-outline', route: '/admin/referentiel' },
   { titre: 'Validation des sujets', icone: 'mdi-check-circle-outline', route: '/admin/sujets' },
-  { titre: 'Tous les projets', icone: 'mdi-folder-multiple-outline', texte: 'Lot 3' },
+  { titre: 'Tous les projets', icone: 'mdi-folder-multiple-outline', route: '/admin/projets' },
   { titre: 'Statistiques', icone: 'mdi-chart-box-outline', route: '/admin/stats' },
   { titre: "Journal d'audit", icone: 'mdi-shield-search', texte: 'Lot 7' },
 ]
