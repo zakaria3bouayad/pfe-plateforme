@@ -42,6 +42,12 @@ const routes = [
     meta: { roles: ['ETUDIANT'] },
   },
   {
+    path: '/etudiant/jalons',
+    name: 'etudiant-jalons',
+    component: () => import('@/views/EtudiantJalonsView.vue'),
+    meta: { roles: ['ETUDIANT'] },
+  },
+  {
     path: '/encadrant',
     name: 'dashboard-encadrant',
     component: () => import('@/views/DashboardEncadrant.vue'),
@@ -54,6 +60,12 @@ const routes = [
     meta: { roles: ['ENCADRANT'] },
   },
   {
+    path: '/encadrant/jalons',
+    name: 'encadrant-jalons',
+    component: () => import('@/views/EncadrantJalonsView.vue'),
+    meta: { roles: ['ENCADRANT'] },
+  },
+  {
     path: '/admin',
     name: 'dashboard-admin',
     component: () => import('@/views/DashboardAdmin.vue'),
@@ -63,6 +75,12 @@ const routes = [
     path: '/admin/sujets',
     name: 'admin-sujets',
     component: () => import('@/views/AdminSujetsView.vue'),
+    meta: { roles: ['ADMINISTRATEUR'] },
+  },
+  {
+    path: '/admin/stats',
+    name: 'admin-stats',
+    component: () => import('@/views/AdminStatsView.vue'),
     meta: { roles: ['ADMINISTRATEUR'] },
   },
 

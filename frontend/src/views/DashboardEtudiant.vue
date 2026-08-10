@@ -6,6 +6,7 @@ const auth = useAuthStore()
 
 const cartes = [
   { titre: 'Mon projet', icone: 'mdi-folder-outline', route: '/etudiant/projet' },
+  { titre: 'Jalons', icone: 'mdi-flag-checkered', route: '/etudiant/jalons' },
   { titre: 'Sujets disponibles', icone: 'mdi-lightbulb-outline', route: '/etudiant/sujets' },
   { titre: 'Mon équipe', icone: 'mdi-account-group-outline', route: '/etudiant/equipe' },
   { titre: 'Documents', icone: 'mdi-file-document-outline', texte: 'Lot 4' },

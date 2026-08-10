@@ -9,7 +9,7 @@ const cartes = [
   { titre: 'Filières et promotions', icone: 'mdi-school-outline', texte: 'Lot 2' },
   { titre: 'Validation des sujets', icone: 'mdi-check-circle-outline', route: '/admin/sujets' },
   { titre: 'Tous les projets', icone: 'mdi-folder-multiple-outline', texte: 'Lot 3' },
-  { titre: 'Statistiques', icone: 'mdi-chart-box-outline', texte: 'Lot 3' },
+  { titre: 'Statistiques', icone: 'mdi-chart-box-outline', route: '/admin/stats' },
   { titre: "Journal d'audit", icone: 'mdi-shield-search', texte: 'Lot 7' },
 ]
 </script>

@@ -22,3 +22,20 @@ export const COULEURS_STATUT_SUJET = {
   AFFECTE: 'teal',
   CLOTURE: 'grey-darken-2',
 }
+
+/** Statuts d'un jalon (Lot 3). EN_RETARD est calcule automatiquement (EF-26). */
+export const LIBELLES_STATUT_ETAPE = {
+  A_FAIRE: 'À faire',
+  EN_COURS: 'En cours',
+  SOUMISE: 'Soumis',
+  VALIDEE: 'Validé',
+  EN_RETARD: 'En retard',
+}
+
+export const COULEURS_STATUT_ETAPE = {
+  A_FAIRE: 'grey',
+  EN_COURS: 'blue',
+  SOUMISE: 'orange',
+  VALIDEE: 'green',
+  EN_RETARD: 'red',
+}
