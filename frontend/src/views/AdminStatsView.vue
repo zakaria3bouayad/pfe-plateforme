@@ -39,7 +39,7 @@ const tuiles = computed(() => {
     { titre: 'Projets', valeur: s.totalProjets, icone: 'mdi-folder-multiple-outline', couleur: 'deep-purple-darken-2' },
     { titre: 'Projets en cours', valeur: s.projetsEnCours, icone: 'mdi-progress-clock', couleur: 'deep-purple-darken-2' },
     {
-      titre: 'Jalons en retard',
+      titre: 'Checkpoints en retard',
       valeur: s.totalJalonsEnRetard,
       icone: 'mdi-alert-circle-outline',
       couleur: s.totalJalonsEnRetard > 0 ? 'red-darken-1' : 'grey',

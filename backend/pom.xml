@@ -80,6 +80,25 @@
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+		<!-- ==================== MinIO (Lot 4) ==================== -->
+		<dependency>
+			<groupId>io.minio</groupId>
+			<artifactId>minio</artifactId>
+			<version>9.0.3</version>
+		</dependency>
+		<!-- Le minio-java 9.0.3 declare okhttp 5.3.2, publie en Kotlin Multiplatform :
+		     l'artefact "okhttp" plain-Maven recupere alors un jar quasi-vide (767
+		     octets, juste les metadonnees), les vraies classes etant dans des
+		     variantes resolues seulement via Gradle Module Metadata. On force donc
+		     explicitement la derniere version pre-KMP, qui publie un jar JVM classique
+		     et gagne sur 5.3.2 par la regle Maven "nearest wins" (declaration a la
+		     racine, plus proche que celle de minio). -->
+		<dependency>
+			<groupId>com.squareup.okhttp3</groupId>
+			<artifactId>okhttp</artifactId>
+			<version>4.12.0</version>
+		</dependency>
+		<!-- ========================================================= -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>

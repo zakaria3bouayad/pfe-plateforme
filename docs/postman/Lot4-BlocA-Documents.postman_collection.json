@@ -1,0 +1,431 @@
+{
+  "info": {
+    "name": "PFE - Lot 4 Bloc A - Documents (etape 4.5)",
+    "description": "Collection de test pour DocumentController (Lot 4, bloc A). Executer les dossiers dans l'ordre : 0. Auth, puis 1. Documents.\n\nComptes utilises :\n- Encadrant : karim.benali@pfe.local / Encadrant@2026\n- Etudiant (chef d'equipe attendu) : yassine.alami@pfe.local / Etudiant@2026, sinon essayer sara.bennani@pfe.local / Etudiant@2026 (comme au lot 3, verifier via l'appel \"Equipe du projet\")\n- Admin : admin@pfe.local / Admin@2026 (utilise uniquement pour la verification 403 sur la suppression)\n\nDeux requetes necessitent une action manuelle avant l'envoi : \"Upload document lie a un jalon (v1)\" et \"Upload meme nom -> v2\" attendent un fichier attache dans l'onglet Body > form-data (champ \"fichier\"). Attacher DEUX FOIS EXACTEMENT LE MEME FICHIER (meme nom) pour verifier le versionnement automatique.\n\nPrerequis : docker compose up -d (le service minio doit tourner, sinon le backend refuse de demarrer / l'upload echoue en 500), et ddl-auto=update le temps du developpement (voir application.properties).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" },
+    { "key": "tokenEncadrant", "value": "" },
+    { "key": "tokenEtudiant", "value": "" },
+    { "key": "tokenAdmin", "value": "" },
+    { "key": "emailEtudiantChef", "value": "yassine.alami@pfe.local" },
+    { "key": "motDePasseEtudiantChef", "value": "Etudiant@2026" },
+    { "key": "projetId", "value": "" },
+    { "key": "equipeId", "value": "" },
+    { "key": "etapeId", "value": "" },
+    { "key": "documentIdV1", "value": "" },
+    { "key": "documentIdV2", "value": "" },
+    { "key": "documentIdGeneral", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Auth",
+      "item": [
+        {
+          "name": "Login encadrant (karim.benali)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"karim.benali@pfe.local\",\n  \"motDePasse\": \"Encadrant@2026\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenEncadrant', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login etudiant (chef d'equipe attendu)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailEtudiantChef}}\",\n  \"motDePasse\": \"{{motDePasseEtudiantChef}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenEtudiant', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login admin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@pfe.local\",\n  \"motDePasse\": \"Admin@2026\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenAdmin', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Documents",
+      "item": [
+        {
+          "name": "Mon projet (etudiant) -> capture projetId/equipeId",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/projets/moi", "host": ["{{baseUrl}}"], "path": ["api", "projets", "moi"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('projetId', data.id);",
+                  "pm.collectionVariables.set('equipeId', data.equipeId);",
+                  "console.log('projetId =', data.id, '/ equipeId =', data.equipeId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Equipe du projet (verifier le chef)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/equipes/{{equipeId}}", "host": ["{{baseUrl}}"], "path": ["api", "equipes", "{{equipeId}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "console.log('chefNom =', data.chefNom, '(verifier que emailEtudiantChef correspond bien a cette personne, sinon changer la variable et refaire le login etudiant)');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Creer un jalon (encadrant) -> capture etapeId",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/projets/{{projetId}}/etapes", "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "etapes"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titre\": \"Livrable lot 4 (test documents)\",\n  \"description\": \"Jalon cree pour tester l'upload de documents\",\n  \"dateEcheance\": \"2026-10-01\",\n  \"ordre\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('etapeId', data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload document lie a un jalon (v1)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/projets/{{projetId}}/documents?etapeId={{etapeId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "documents"],
+              "query": [{ "key": "etapeId", "value": "{{etapeId}}" }]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "fichier", "type": "file", "src": [] }
+              ]
+            },
+            "description": "Attacher un fichier dans Body > form-data (champ 'fichier') avant d'envoyer. Ne pas ajouter de header Content-Type manuel : Postman genere la boundary multipart automatiquement."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "pm.test('version 1', () => pm.expect(data.version).to.eql(1));",
+                  "pm.test('etapeId correct', () => pm.expect(data.etapeId).to.eql(parseInt(pm.collectionVariables.get('etapeId'))));",
+                  "pm.collectionVariables.set('documentIdV1', data.id);",
+                  "console.log('nom du fichier =', data.nom, '(reutiliser EXACTEMENT le meme fichier pour le test de versionnement)');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload meme nom -> v2 (versionnement automatique)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/projets/{{projetId}}/documents?etapeId={{etapeId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "documents"],
+              "query": [{ "key": "etapeId", "value": "{{etapeId}}" }]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "fichier", "type": "file", "src": [] }
+              ]
+            },
+            "description": "Attacher EXACTEMENT LE MEME FICHIER (meme nom original) que la requete precedente : c'est le nom qui determine le versionnement."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "pm.test('version 2', () => pm.expect(data.version).to.eql(2));",
+                  "pm.collectionVariables.set('documentIdV2', data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload par un encadrant (role non autorise -> 403)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/projets/{{projetId}}/documents",
+              "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "documents"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "fichier", "type": "file", "src": [] }
+              ]
+            },
+            "description": "Peut reutiliser n'importe quel petit fichier, la requete doit etre bloquee avant meme d'atteindre le service (403 par @PreAuthorize hasRole('ETUDIANT'))."
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden (role ENCADRANT)', () => pm.response.to.have.status(403));"] } }
+          ]
+        },
+        {
+          "name": "Upload document general (sans jalon) -> capture documentIdGeneral",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/projets/{{projetId}}/documents",
+              "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "documents"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "fichier", "type": "file", "src": [] }
+              ]
+            },
+            "description": "Pas de query param etapeId : document rattache directement au projet."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "pm.test('etapeId absent', () => pm.expect(data.etapeId).to.be.null);",
+                  "pm.collectionVariables.set('documentIdGeneral', data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lister les documents du projet",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/projets/{{projetId}}/documents", "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "documents"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('au moins 3 documents actifs (v1 jalon, v2 jalon, general)', () => pm.expect(data.length).to.be.above(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lister les documents du jalon",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/etapes/{{etapeId}}/documents", "host": ["{{baseUrl}}"], "path": ["api", "etapes", "{{etapeId}}", "documents"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('exactement 2 versions (v1 + v2)', () => pm.expect(data.length).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historique des versions (via documentIdV2)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/documents/{{documentIdV2}}/versions", "host": ["{{baseUrl}}"], "path": ["api", "documents", "{{documentIdV2}}", "versions"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('2 versions, ordre decroissant (2 puis 1)', () => {",
+                  "  pm.expect(data.length).to.eql(2);",
+                  "  pm.expect(data[0].version).to.eql(2);",
+                  "  pm.expect(data[1].version).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telecharger un document",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/documents/{{documentIdV2}}/telecharger", "host": ["{{baseUrl}}"], "path": ["api", "documents", "{{documentIdV2}}", "telecharger"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Content-Disposition present', () => pm.expect(pm.response.headers.has('Content-Disposition')).to.be.true);",
+                  "pm.test('corps non vide', () => pm.expect(pm.response.responseSize).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telecharger un document inexistant (attendu 404)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/documents/999999/telecharger", "host": ["{{baseUrl}}"], "path": ["api", "documents", "999999", "telecharger"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] } }
+          ]
+        },
+        {
+          "name": "Supprimer un document par un tiers non autorise (admin -> 403)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": { "raw": "{{baseUrl}}/api/documents/{{documentIdGeneral}}", "host": ["{{baseUrl}}"], "path": ["api", "documents", "{{documentIdGeneral}}"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden (role ADMINISTRATEUR)', () => pm.response.to.have.status(403));"] } }
+          ]
+        },
+        {
+          "name": "Supprimer un document (encadrant du projet)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/documents/{{documentIdGeneral}}", "host": ["{{baseUrl}}"], "path": ["api", "documents", "{{documentIdGeneral}}"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"] } }
+          ]
+        },
+        {
+          "name": "Telecharger un document supprime (attendu 404)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/documents/{{documentIdGeneral}}/telecharger", "host": ["{{baseUrl}}"], "path": ["api", "documents", "{{documentIdGeneral}}", "telecharger"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('404 Not Found (suppression logique)', () => pm.response.to.have.status(404));"] } }
+          ]
+        },
+        {
+          "name": "Supprimer un document deja supprime (attendu 404)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/documents/{{documentIdGeneral}}", "host": ["{{baseUrl}}"], "path": ["api", "documents", "{{documentIdGeneral}}"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] } }
+          ]
+        }
+      ]
+    }
+  ]
+}

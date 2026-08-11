@@ -13,6 +13,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -62,6 +63,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ErrorResponse.of(
                 HttpStatus.BAD_REQUEST.value(), "Bad Request",
                 "Corps de requete illisible ou mal forme", request.getRequestURI()));
+    }
+
+    /** Parametre d'URL du mauvais type : ex. /api/documents/null/telecharger au lieu d'un id numerique. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+
+        String attendu = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "valeur";
+        return ResponseEntity.badRequest().body(ErrorResponse.of(
+                HttpStatus.BAD_REQUEST.value(), "Bad Request",
+                "Parametre '" + ex.getName() + "' invalide : " + attendu + " attendu",
+                request.getRequestURI()));
     }
 
     /** Identifiants incorrects : message volontairement non discriminant. */

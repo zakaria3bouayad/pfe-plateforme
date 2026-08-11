@@ -100,7 +100,7 @@ async function soumettreFormulaire() {
       await api.post(`/projets/${projetId.value}/etapes`, f.value)
     }
     dialogueOuvert.value = false
-    succes.value = modeEdition.value ? 'Jalon modifié.' : 'Jalon créé.'
+    succes.value = modeEdition.value ? 'Checkpoint modifié.' : 'Checkpoint créé.'
     await chargerJalons()
   } catch (e) {
     erreur.value = messageErreur(e)
@@ -108,7 +108,7 @@ async function soumettreFormulaire() {
 }
 
 async function supprimer(jalon) {
-  if (!confirm(`Supprimer le jalon "${jalon.titre}" ?`)) return
+  if (!confirm(`Supprimer le checkpoint "${jalon.titre}" ?`)) return
   erreur.value = null
   try {
     await api.delete(`/etapes/${jalon.id}`)
@@ -139,7 +139,7 @@ async function valider() {
     await api.patch(`/etapes/${jalonAValider.value.id}/valider`, {
       commentaire: commentaireValidation.value.trim() || null,
     })
-    succes.value = `Jalon "${jalonAValider.value.titre}" validé.`
+    succes.value = `Checkpoint "${jalonAValider.value.titre}" validé.`
     dialogueValidation.value = false
     await chargerJalons()
   } catch (e) {
@@ -151,7 +151,7 @@ async function valider() {
 </script>
 
 <template>
-  <LayoutDashboard titre="Jalons" icone="mdi-flag-checkered" couleur="teal-darken-2">
+  <LayoutDashboard titre="Checkpoints" icone="mdi-flag-checkered" couleur="teal-darken-2">
     <div class="d-flex justify-space-between align-center mb-4">
       <v-btn variant="text" to="/encadrant" prepend-icon="mdi-arrow-left">Retour</v-btn>
       <v-btn
@@ -160,7 +160,7 @@ async function valider() {
         prepend-icon="mdi-plus"
         @click="ouvrirCreation"
       >
-        Créer un jalon
+        Créer un checkpoint
       </v-btn>
     </div>
 
@@ -188,7 +188,7 @@ async function valider() {
     <v-progress-linear v-if="chargementJalons" indeterminate color="teal-darken-2" class="mb-4" />
 
     <v-alert v-if="!chargementJalons && projetId && jalons.length === 0" type="info" variant="tonal">
-      Aucun jalon créé pour ce projet.
+      Aucun checkpoint créé pour ce projet.
     </v-alert>
 
     <v-card v-for="j in jalons" :key="j.id" variant="outlined" rounded="lg" class="mb-4">
@@ -238,7 +238,7 @@ async function valider() {
     <!-- Creation / edition -->
     <v-dialog v-model="dialogueOuvert" max-width="560">
       <v-card rounded="lg">
-        <v-card-title class="pt-4">{{ modeEdition ? 'Modifier le jalon' : 'Créer un jalon' }}</v-card-title>
+        <v-card-title class="pt-4">{{ modeEdition ? 'Modifier le checkpoint' : 'Créer un checkpoint' }}</v-card-title>
         <v-card-text>
           <v-form v-model="formulaireValide" @submit.prevent="soumettreFormulaire">
             <v-text-field

@@ -6,9 +6,9 @@ const auth = useAuthStore()
 
 const cartes = [
   { titre: 'Mes sujets proposés', icone: 'mdi-lightbulb-on-outline', route: '/encadrant/sujets' },
-  { titre: 'Projets encadrés', icone: 'mdi-folder-multiple-outline', texte: 'Lot 3' },
-  { titre: 'Jalons', icone: 'mdi-flag-checkered', route: '/encadrant/jalons' },
-  { titre: 'Livrables à commenter', icone: 'mdi-comment-text-outline', texte: 'Lot 4' },
+  { titre: 'Projets encadrés', icone: 'mdi-folder-multiple-outline', route: '/encadrant/projets' },
+  { titre: 'Checkpoints', icone: 'mdi-flag-checkered', route: '/encadrant/jalons' },
+  { titre: 'Livrables à commenter', icone: 'mdi-comment-text-outline', route: '/encadrant/documents' },
   { titre: 'Discussions', icone: 'mdi-forum-outline', texte: 'Lot 5' },
   { titre: 'Rapports de similarité', icone: 'mdi-file-compare', texte: 'Lot 6' },
 ]

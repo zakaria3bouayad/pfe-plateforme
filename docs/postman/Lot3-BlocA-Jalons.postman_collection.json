@@ -1,0 +1,296 @@
+{
+  "info": {
+    "name": "PFE - Lot 3 Bloc A - Jalons (etape 3.5)",
+    "description": "Collection de test pour EtapeController (Lot 3, bloc A). Executer les dossiers dans l'ordre : 0. Auth, puis 1. Jalons. Les scripts de test capturent automatiquement les IDs dans les variables de collection.\n\nComptes utilises :\n- Encadrant : karim.benali@pfe.local / Encadrant@2026\n- Etudiant (chef d'equipe a confirmer) : yassine.alami@pfe.local / Etudiant@2026, sinon sara.bennani@pfe.local / Etudiant@2026\n\nLimite connue : le calcul automatique EN_RETARD (EF-26) tourne via un job planifie (cron quotidien 1h), il n'y a pas d'endpoint HTTP pour le declencher manuellement. Pour le tester sans attendre, cree un jalon avec une date_echeance passee puis avance l'heure systeme, ou attends le prochain declenchement du job.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" },
+    { "key": "tokenEncadrant", "value": "" },
+    { "key": "tokenEtudiant", "value": "" },
+    { "key": "emailEtudiantChef", "value": "yassine.alami@pfe.local" },
+    { "key": "motDePasseEtudiantChef", "value": "Etudiant@2026" },
+    { "key": "projetId", "value": "" },
+    { "key": "equipeId", "value": "" },
+    { "key": "etapeId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Auth",
+      "item": [
+        {
+          "name": "Login encadrant (karim.benali)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"karim.benali@pfe.local\",\n  \"motDePasse\": \"Encadrant@2026\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenEncadrant', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login etudiant (chef d'equipe attendu)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailEtudiantChef}}\",\n  \"motDePasse\": \"{{motDePasseEtudiantChef}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenEtudiant', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Jalons",
+      "item": [
+        {
+          "name": "Mes projets (encadrant) -> capture projetId",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/projets/mes-projets", "host": ["{{baseUrl}}"], "path": ["api", "projets", "mes-projets"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('au moins un projet', () => pm.expect(data.length).to.be.above(0));",
+                  "if (data.length > 0) {",
+                  "  pm.collectionVariables.set('projetId', data[0].id);",
+                  "  pm.collectionVariables.set('equipeId', data[0].equipeId);",
+                  "  console.log('projetId =', data[0].id, '/ equipeId =', data[0].equipeId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Equipe du projet (verifier le chef)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/equipes/{{equipeId}}", "host": ["{{baseUrl}}"], "path": ["api", "equipes", "{{equipeId}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "console.log('chefNom =', data.chefNom, '(verifier que emailEtudiantChef correspond bien a cette personne)');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lister les jalons du projet",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/projets/{{projetId}}/etapes", "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "etapes"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }
+          ]
+        },
+        {
+          "name": "Creer un jalon (encadrant) -> capture etapeId",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/projets/{{projetId}}/etapes", "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "etapes"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titre\": \"Cahier des charges\",\n  \"description\": \"Redaction et depot du cahier des charges initial\",\n  \"dateEcheance\": \"2026-09-15\",\n  \"ordre\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "pm.test('statut initial A_FAIRE', () => pm.expect(data.statut).to.eql('A_FAIRE'));",
+                  "pm.collectionVariables.set('etapeId', data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Creer un jalon SANS etre l'encadrant du projet (attendu 403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/projets/{{projetId}}/etapes", "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "etapes"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titre\": \"Ne doit pas passer\",\n  \"description\": \"Un etudiant ne peut pas creer de jalon\",\n  \"dateEcheance\": \"2026-09-15\",\n  \"ordre\": 2\n}"
+            }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden (role ETUDIANT)', () => pm.response.to.have.status(403));"] } }
+          ]
+        },
+        {
+          "name": "Obtenir un jalon",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/etapes/{{etapeId}}", "host": ["{{baseUrl}}"], "path": ["api", "etapes", "{{etapeId}}"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }
+          ]
+        },
+        {
+          "name": "Modifier un jalon (encadrant)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/etapes/{{etapeId}}", "host": ["{{baseUrl}}"], "path": ["api", "etapes", "{{etapeId}}"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titre\": \"Cahier des charges (v2)\",\n  \"description\": \"Redaction et depot du cahier des charges initial - version corrigee\",\n  \"dateEcheance\": \"2026-09-20\",\n  \"ordre\": 1\n}"
+            }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }
+          ]
+        },
+        {
+          "name": "Soumettre le jalon (etudiant, mauvais chef -> attendu 403 si pas le vrai chef)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/etapes/{{etapeId}}/soumettre", "host": ["{{baseUrl}}"], "path": ["api", "etapes", "{{etapeId}}", "soumettre"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lienLivrable\": \"https://github.com/exemple/pfe/blob/main/cahier-des-charges.pdf\",\n  \"commentaire\": \"Premiere version du cahier des charges\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const code = pm.response.code;",
+                  "pm.test('200 (chef) ou 403 (pas le chef, verifier emailEtudiantChef)', () => pm.expect([200, 403]).to.include(code));",
+                  "if (code === 200) { const data = pm.response.json(); pm.test('statut SOUMISE', () => pm.expect(data.statut).to.eql('SOUMISE')); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Supprimer un jalon deja soumis (attendu 409)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/etapes/{{etapeId}}", "host": ["{{baseUrl}}"], "path": ["api", "etapes", "{{etapeId}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const code = pm.response.code;",
+                  "pm.test('409 si SOUMISE, sinon 204 (jalon pas encore soumis)', () => pm.expect([204, 409]).to.include(code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Valider le jalon (encadrant)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/etapes/{{etapeId}}/valider", "host": ["{{baseUrl}}"], "path": ["api", "etapes", "{{etapeId}}", "valider"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commentaire\": \"Cahier des charges conforme, valide.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const code = pm.response.code;",
+                  "pm.test('200 (si SOUMISE) ou 409 (si soumission precedente refusee/absente)', () => pm.expect([200, 409]).to.include(code));",
+                  "if (code === 200) { const data = pm.response.json(); pm.test('statut VALIDEE', () => pm.expect(data.statut).to.eql('VALIDEE')); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Valider un jalon deja valide (attendu 409)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/etapes/{{etapeId}}/valider", "host": ["{{baseUrl}}"], "path": ["api", "etapes", "{{etapeId}}", "valider"] },
+            "body": { "mode": "raw", "raw": "{}" }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('409 Conflict', () => pm.response.to.have.status(409));"] } }
+          ]
+        }
+      ]
+    }
+  ]
+}

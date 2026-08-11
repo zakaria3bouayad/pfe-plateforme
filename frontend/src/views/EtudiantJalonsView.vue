@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import LayoutDashboard from '@/components/LayoutDashboard.vue'
 import api, { messageErreur } from '@/services/api'
+import { telechargerDocument, premierFichier } from '@/services/documents'
 import { useAuthStore } from '@/stores/authStore'
 import { LIBELLES_STATUT_ETAPE, COULEURS_STATUT_ETAPE } from '@/utils/statuts'
 
@@ -10,6 +11,7 @@ const auth = useAuthStore()
 const projet = ref(null)
 const equipe = ref(null)
 const jalons = ref([])
+const documents = ref([])
 const chargement = ref(true)
 const erreur = ref(null)
 const succes = ref(null)
@@ -41,12 +43,17 @@ async function charger() {
     const { data: p } = await api.get('/projets/moi')
     projet.value = p
 
-    const { data: e } = await api.get(`/projets/${p.id}/etapes`)
+    const [{ data: e }, { data: d }] = await Promise.all([
+      api.get(`/projets/${p.id}/etapes`),
+      api.get(`/projets/${p.id}/documents`),
+    ])
     jalons.value = e
+    documents.value = d
   } catch (e) {
     if (e.response?.status === 404) {
       projet.value = null
       jalons.value = []
+      documents.value = []
     } else {
       erreur.value = messageErreur(e)
     }
@@ -57,27 +64,53 @@ async function charger() {
 
 onMounted(charger)
 
+/** Dernier livrable depose pour ce jalon (Lot 4 : remplace le lien texte du lot 3). */
+function livrableDuJalon(jalonId) {
+  return documents.value
+    .filter((d) => d.etapeId === jalonId)
+    .sort((a, b) => b.version - a.version)[0] ?? null
+}
+
+async function telecharger(doc) {
+  erreur.value = null
+  try {
+    await telechargerDocument(doc.id, doc.nom)
+  } catch (e) {
+    erreur.value = messageErreur(e)
+  }
+}
+
 // ------------------------------------------------------------ soumission
 
 const dialogueOuvert = ref(false)
 const jalonCible = ref(null)
 const envoiEnCours = ref(false)
-const formulaire = ref({ lienLivrable: '', commentaire: '' })
+const formulaire = ref({ fichier: null, commentaire: '' })
 
 function ouvrirDialogue(jalon) {
   jalonCible.value = jalon
-  formulaire.value = { lienLivrable: '', commentaire: '' }
+  formulaire.value = { fichier: null, commentaire: '' }
   erreur.value = null
   dialogueOuvert.value = true
 }
 
 async function soumettre() {
-  if (!jalonCible.value) return
+  const fichier = premierFichier(formulaire.value.fichier)
+  if (!jalonCible.value || !fichier) return
+
   envoiEnCours.value = true
   erreur.value = null
   try {
+    const donnees = new FormData()
+    donnees.append('fichier', fichier)
+
+    const { data: doc } = await api.post(`/projets/${projet.value.id}/documents`, donnees, {
+      params: { etapeId: jalonCible.value.id },
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+
     await api.patch(`/etapes/${jalonCible.value.id}/soumettre`, {
-      lienLivrable: formulaire.value.lienLivrable.trim(),
+      lienLivrable: `Document déposé : ${doc.nom} (v${doc.version})`,
       commentaire: formulaire.value.commentaire.trim() || null,
     })
     succes.value = `Livrable soumis pour "${jalonCible.value.titre}".`
@@ -97,7 +130,7 @@ function formatDate(iso) {
 </script>
 
 <template>
-  <LayoutDashboard titre="Jalons du projet" icone="mdi-flag-checkered" couleur="primary">
+  <LayoutDashboard titre="Checkpoints du projet" icone="mdi-flag-checkered" couleur="primary">
     <v-btn variant="text" to="/etudiant" prepend-icon="mdi-arrow-left" class="mb-4">Retour</v-btn>
 
     <v-alert v-if="erreur" type="error" variant="tonal" density="compact" class="mb-4" :text="erreur" />
@@ -106,7 +139,7 @@ function formatDate(iso) {
     <v-progress-linear v-if="chargement" indeterminate color="primary" class="mb-4" />
 
     <v-alert v-if="!chargement && !projet" type="info" variant="tonal">
-      Aucun projet pour l'instant. Les jalons apparaîtront ici une fois votre équipe affectée à un sujet.
+      Aucun projet pour l'instant. Les checkpoints apparaîtront ici une fois votre équipe affectée à un sujet.
     </v-alert>
 
     <v-alert v-else-if="!chargement && !estChef" type="info" variant="tonal" class="mb-4">
@@ -115,7 +148,7 @@ function formatDate(iso) {
 
     <template v-if="!chargement && projet">
       <v-alert v-if="jalons.length === 0" type="info" variant="tonal">
-        Votre encadrant n'a pas encore créé de jalon pour ce projet.
+        Votre encadrant n'a pas encore créé de checkpoint pour ce projet.
       </v-alert>
 
       <v-card v-for="j in jalons" :key="j.id" variant="outlined" rounded="lg" class="mb-4">
@@ -132,9 +165,17 @@ function formatDate(iso) {
         <v-card-text>
           <p class="mb-2">{{ j.description }}</p>
 
-          <div v-if="j.lienLivrable" class="mb-2">
-            <strong>Livrable soumis :</strong>
-            <a :href="j.lienLivrable" target="_blank" rel="noopener">{{ j.lienLivrable }}</a>
+          <div v-if="livrableDuJalon(j.id)" class="mb-2 d-flex align-center">
+            <strong class="mr-2">Livrable soumis :</strong>
+            <v-btn
+              variant="text"
+              size="small"
+              color="primary"
+              prepend-icon="mdi-download"
+              @click="telecharger(livrableDuJalon(j.id))"
+            >
+              {{ livrableDuJalon(j.id).nom }} (v{{ livrableDuJalon(j.id).version }})
+            </v-btn>
             <span class="text-caption text-medium-emphasis"> — le {{ formatDate(j.dateSoumission) }}</span>
           </div>
           <p v-if="j.commentaireSoumission" class="text-caption text-medium-emphasis mb-2">
@@ -160,12 +201,7 @@ function formatDate(iso) {
       <v-card rounded="lg">
         <v-card-title>Soumettre : {{ jalonCible?.titre }}</v-card-title>
         <v-card-text>
-          <v-text-field
-            v-model="formulaire.lienLivrable"
-            label="Lien vers le livrable (Drive, GitHub, ...)"
-            placeholder="https://..."
-            required
-          />
+          <v-file-input v-model="formulaire.fichier" label="Fichier du livrable" show-size prepend-icon="mdi-paperclip" />
           <v-textarea v-model="formulaire.commentaire" label="Commentaire (optionnel)" rows="3" />
         </v-card-text>
         <v-card-actions>
@@ -175,7 +211,7 @@ function formatDate(iso) {
             color="primary"
             variant="tonal"
             :loading="envoiEnCours"
-            :disabled="!formulaire.lienLivrable.trim()"
+            :disabled="!premierFichier(formulaire.fichier)"
             @click="soumettre"
           >
             Envoyer

@@ -1,0 +1,215 @@
+{
+  "info": {
+    "name": "PFE - Lot 3 Bloc B - Stats (etape 3.8)",
+    "description": "Collection de test pour StatsController (Lot 3, bloc B). Executer les dossiers dans l'ordre : 0. Auth, puis 1. Stats.\n\nComptes utilises :\n- Etudiant : yassine.alami@pfe.local / Etudiant@2026\n- Encadrant : karim.benali@pfe.local / Encadrant@2026\n- Admin : admin@pfe.local / Admin@2026\n\nCette collection verifie a la fois les valeurs retournees et le controle d'acces par role (@PreAuthorize) : chaque route stats doit refuser les deux autres roles avec un 403, et refuser un appel sans jeton avec un 401.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" },
+    { "key": "tokenEtudiant", "value": "" },
+    { "key": "tokenEncadrant", "value": "" },
+    { "key": "tokenAdmin", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Auth",
+      "item": [
+        {
+          "name": "Login etudiant (yassine.alami)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"yassine.alami@pfe.local\",\n  \"motDePasse\": \"Etudiant@2026\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenEtudiant', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login encadrant (karim.benali)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"karim.benali@pfe.local\",\n  \"motDePasse\": \"Encadrant@2026\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenEncadrant', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login admin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@pfe.local\",\n  \"motDePasse\": \"Admin@2026\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenAdmin', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Stats",
+      "item": [
+        {
+          "name": "Stats etudiant (etudiant)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/stats/etudiant", "host": ["{{baseUrl}}"], "path": ["api", "stats", "etudiant"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('champs presents', () => {",
+                  "  ['projetId','projetStatut','totalJalons','jalonsValides','jalonsEnRetard','jalonsRestants','prochaineEcheance'].forEach(k => pm.expect(data).to.have.property(k));",
+                  "});",
+                  "console.log('stats etudiant =', JSON.stringify(data));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stats etudiant avec role ENCADRANT (attendu 403)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/stats/etudiant", "host": ["{{baseUrl}}"], "path": ["api", "stats", "etudiant"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden', () => pm.response.to.have.status(403));"] } }
+          ]
+        },
+        {
+          "name": "Stats encadrant (encadrant)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/stats/encadrant", "host": ["{{baseUrl}}"], "path": ["api", "stats", "encadrant"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('champs presents et >= 0', () => {",
+                  "  ['sujetsEnAttenteValidation','projetsEnCours','jalonsAValider','jalonsEnRetard'].forEach(k => {",
+                  "    pm.expect(data).to.have.property(k);",
+                  "    pm.expect(data[k]).to.be.at.least(0);",
+                  "  });",
+                  "});",
+                  "console.log('stats encadrant =', JSON.stringify(data));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stats encadrant avec role ETUDIANT (attendu 403)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/stats/encadrant", "host": ["{{baseUrl}}"], "path": ["api", "stats", "encadrant"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden', () => pm.response.to.have.status(403));"] } }
+          ]
+        },
+        {
+          "name": "Stats admin (admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": { "raw": "{{baseUrl}}/api/stats/admin", "host": ["{{baseUrl}}"], "path": ["api", "stats", "admin"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('compteurs globaux coherents', () => {",
+                  "  ['totalEtudiants','totalEncadrants','totalEquipes','totalSujets','sujetsEnAttenteValidation','totalProjets','projetsEnCours','totalJalonsEnRetard'].forEach(k => {",
+                  "    pm.expect(data).to.have.property(k);",
+                  "    pm.expect(data[k]).to.be.at.least(0);",
+                  "  });",
+                  "  pm.expect(data.totalSujets).to.be.at.least(data.sujetsEnAttenteValidation);",
+                  "  pm.expect(data.totalProjets).to.be.at.least(data.projetsEnCours);",
+                  "});",
+                  "console.log('stats admin =', JSON.stringify(data));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stats admin avec role ENCADRANT (attendu 403)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/stats/admin", "host": ["{{baseUrl}}"], "path": ["api", "stats", "admin"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden', () => pm.response.to.have.status(403));"] } }
+          ]
+        },
+        {
+          "name": "Stats admin sans jeton (attendu 401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/stats/admin", "host": ["{{baseUrl}}"], "path": ["api", "stats", "admin"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] } }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -48,6 +48,12 @@ const routes = [
     meta: { roles: ['ETUDIANT'] },
   },
   {
+    path: '/etudiant/documents',
+    name: 'etudiant-documents',
+    component: () => import('@/views/EtudiantDocumentsView.vue'),
+    meta: { roles: ['ETUDIANT'] },
+  },
+  {
     path: '/encadrant',
     name: 'dashboard-encadrant',
     component: () => import('@/views/DashboardEncadrant.vue'),
@@ -60,9 +66,21 @@ const routes = [
     meta: { roles: ['ENCADRANT'] },
   },
   {
+    path: '/encadrant/projets',
+    name: 'encadrant-projets',
+    component: () => import('@/views/EncadrantProjetsView.vue'),
+    meta: { roles: ['ENCADRANT'] },
+  },
+  {
     path: '/encadrant/jalons',
     name: 'encadrant-jalons',
     component: () => import('@/views/EncadrantJalonsView.vue'),
+    meta: { roles: ['ENCADRANT'] },
+  },
+  {
+    path: '/encadrant/documents',
+    name: 'encadrant-documents',
+    component: () => import('@/views/EncadrantDocumentsView.vue'),
     meta: { roles: ['ENCADRANT'] },
   },
   {
