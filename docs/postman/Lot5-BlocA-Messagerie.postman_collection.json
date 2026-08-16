@@ -1,0 +1,307 @@
+{
+  "info": {
+    "name": "PFE - Lot 5 Bloc A - Messagerie (etape 5.3)",
+    "description": "Collection de test pour MessageController (Lot 5, bloc A). Executer les dossiers dans l'ordre : 0. Auth, 1. Mise en place, 2. Messagerie, 3. Cas limites. Collection independante des precedentes (elle recree son propre contexte via le projet de l'etudiant chef).\n\nComptes utilises :\n- Encadrant : karim.benali@pfe.local / Encadrant@2026\n- Etudiant (chef d'equipe attendu) : yassine.alami@pfe.local / Etudiant@2026, sinon sara.bennani@pfe.local / Etudiant@2026 (verifier via 'Equipe du projet', comme aux collections precedentes)\n- Etudiant (non chef, sert au test 403) : l'autre des deux comptes ci-dessus, celui qui n'est PAS le chef\n\nRegle testee : contrairement aux commentaires (lecture ouverte), la messagerie est privee au projet : seuls le chef d'equipe et l'encadrant peuvent lire ET envoyer des messages. Tout autre compte authentifie recoit 403 en lecture comme en ecriture.\n\nPrerequis : ddl-auto=update le temps de creer la table message (a repasser sur validate + migration Flyway V4 en cloture du lot 5, etape 5.11).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" },
+    { "key": "tokenEncadrant", "value": "" },
+    { "key": "tokenEtudiantChef", "value": "" },
+    { "key": "tokenEtudiantAutre", "value": "" },
+    { "key": "emailEtudiantChef", "value": "yassine.alami@pfe.local" },
+    { "key": "motDePasseEtudiantChef", "value": "Etudiant@2026" },
+    { "key": "emailEtudiantAutre", "value": "sara.bennani@pfe.local" },
+    { "key": "motDePasseEtudiantAutre", "value": "Etudiant@2026" },
+    { "key": "projetId", "value": "" },
+    { "key": "equipeId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Auth",
+      "item": [
+        {
+          "name": "Login encadrant (karim.benali)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"karim.benali@pfe.local\",\n  \"motDePasse\": \"Encadrant@2026\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenEncadrant', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login etudiant chef d'equipe attendu",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{emailEtudiantChef}}\",\n  \"motDePasse\": \"{{motDePasseEtudiantChef}}\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenEtudiantChef', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login etudiant autre (non chef attendu)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{emailEtudiantAutre}}\",\n  \"motDePasse\": \"{{motDePasseEtudiantAutre}}\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenEtudiantAutre', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Mise en place",
+      "item": [
+        {
+          "name": "Mon projet (etudiant chef) -> capture projetId/equipeId",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiantChef}}" }],
+            "url": { "raw": "{{baseUrl}}/api/projets/moi", "host": ["{{baseUrl}}"], "path": ["api", "projets", "moi"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('projetId', data.id);",
+                  "pm.collectionVariables.set('equipeId', data.equipeId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Equipe du projet (verifier le chef)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/equipes/{{equipeId}}", "host": ["{{baseUrl}}"], "path": ["api", "equipes", "{{equipeId}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "console.log('chefNom =', data.chefNom, '(doit correspondre a emailEtudiantChef ; sinon inverser emailEtudiantChef/emailEtudiantAutre et refaire les logins)');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Messagerie",
+      "item": [
+        {
+          "name": "Lister messages du projet (vide au depart)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/projets/{{projetId}}/messages", "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "messages"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('liste vide', () => pm.expect(data.length).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Envoyer un message (encadrant)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/projets/{{projetId}}/messages", "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "messages"] },
+            "body": { "mode": "raw", "raw": "{\n  \"contenu\": \"Bonjour, ou en etes-vous sur le jalon en cours ?\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "pm.test('projetId correct', () => pm.expect(data.projetId).to.eql(parseInt(pm.collectionVariables.get('projetId'))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Envoyer un message (etudiant chef)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEtudiantChef}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/projets/{{projetId}}/messages", "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "messages"] },
+            "body": { "mode": "raw", "raw": "{\n  \"contenu\": \"On avance bien, livraison prevue vendredi.\"\n}" }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('201 Created', () => pm.response.to.have.status(201));"] } }
+          ]
+        },
+        {
+          "name": "Envoyer un message (etudiant non participant -> 403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEtudiantAutre}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/projets/{{projetId}}/messages", "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "messages"] },
+            "body": { "mode": "raw", "raw": "{\n  \"contenu\": \"Ne doit pas passer si je ne suis pas le chef d'equipe.\"\n}" }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden (pas chef ni encadrant)', () => pm.response.to.have.status(403));"] } }
+          ]
+        },
+        {
+          "name": "Envoyer un message avec contenu vide (attendu 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/projets/{{projetId}}/messages", "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "messages"] },
+            "body": { "mode": "raw", "raw": "{\n  \"contenu\": \"\"\n}" }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('400 Bad Request (validation)', () => pm.response.to.have.status(400));"] } }
+          ]
+        },
+        {
+          "name": "Lister messages du projet (etudiant non participant -> 403)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiantAutre}}" }],
+            "url": { "raw": "{{baseUrl}}/api/projets/{{projetId}}/messages", "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "messages"] },
+            "description": "Contrairement aux commentaires, la messagerie est privee : la lecture est aussi reservee au chef d'equipe et a l'encadrant."
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden (pas chef ni encadrant)', () => pm.response.to.have.status(403));"] } }
+          ]
+        },
+        {
+          "name": "Lister messages du projet (2 attendus, ordre chronologique)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiantChef}}" }],
+            "url": { "raw": "{{baseUrl}}/api/projets/{{projetId}}/messages", "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "messages"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('2 messages, ordre chronologique croissant', () => {",
+                  "  pm.expect(data.length).to.eql(2);",
+                  "  pm.expect(new Date(data[0].dateEnvoi).getTime()).to.be.at.most(new Date(data[1].dateEnvoi).getTime());",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Cas limites",
+      "item": [
+        {
+          "name": "Envoyer un message sur un projet inexistant (attendu 404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/projets/999999/messages", "host": ["{{baseUrl}}"], "path": ["api", "projets", "999999", "messages"] },
+            "body": { "mode": "raw", "raw": "{\n  \"contenu\": \"Test projet inexistant\"\n}" }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] } }
+          ]
+        },
+        {
+          "name": "Lister messages d'un projet inexistant (attendu 404)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/projets/999999/messages", "host": ["{{baseUrl}}"], "path": ["api", "projets", "999999", "messages"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] } }
+          ]
+        },
+        {
+          "name": "Envoyer un message sans token (attendu 401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/projets/{{projetId}}/messages", "host": ["{{baseUrl}}"], "path": ["api", "projets", "{{projetId}}", "messages"] },
+            "body": { "mode": "raw", "raw": "{\n  \"contenu\": \"Sans authentification\"\n}" }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] } }
+          ]
+        }
+      ]
+    }
+  ]
+}

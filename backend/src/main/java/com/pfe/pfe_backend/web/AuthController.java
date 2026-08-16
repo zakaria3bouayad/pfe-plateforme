@@ -36,10 +36,17 @@ public class AuthController {
         return ResponseEntity.ok(authService.connecter(requete));
     }
 
-    /** Renouvellement de l'access token a partir du refresh token. */
+    /** Renouvellement de l'access token a partir du refresh token (rotation : l'ancien est revoque). */
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> rafraichir(@Valid @RequestBody RefreshRequest requete) {
         return ResponseEntity.ok(authService.rafraichir(requete));
+    }
+
+    /** Deconnexion : revoque le refresh token fourni (Lot 5, bloc C). */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> deconnecter(@Valid @RequestBody RefreshRequest requete) {
+        authService.deconnecter(requete);
+        return ResponseEntity.noContent().build();
     }
 
     /**

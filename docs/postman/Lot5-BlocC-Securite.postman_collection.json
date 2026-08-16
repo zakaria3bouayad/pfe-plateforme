@@ -1,0 +1,141 @@
+{
+  "info": {
+    "name": "PFE - Lot 5 Bloc C - Securite refresh token (etape 5.7)",
+    "description": "Collection de test pour la liste noire des refresh tokens (Redis). Executer les requetes dans l'ordre.\n\nCompte utilise : karim.benali@pfe.local / Encadrant@2026\n\nScenario teste :\n1. Login -> capture refreshToken1\n2. Refresh avec refreshToken1 -> 200, capture refreshToken2 (rotation)\n3. Rejouer refreshToken1 (deja consomme) -> 401\n4. Login -> capture refreshToken3\n5. Logout avec refreshToken3 -> 204\n6. Refresh avec refreshToken3 (revoque par logout) -> 401\n\nPrerequis : docker compose up -d (conteneur redis), backend relance avec la dependance spring-boot-starter-data-redis.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" },
+    { "key": "refreshToken1", "value": "" },
+    { "key": "refreshToken2", "value": "" },
+    { "key": "refreshToken3", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Login -> capture refreshToken1",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"karim.benali@pfe.local\",\n  \"motDePasse\": \"Encadrant@2026\"\n}" }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json();",
+              "pm.collectionVariables.set('refreshToken1', data.refreshToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Refresh avec refreshToken1 -> capture refreshToken2 (rotation)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/refresh", "host": ["{{baseUrl}}"], "path": ["api", "auth", "refresh"] },
+        "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken1}}\"\n}" }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json();",
+              "pm.test('nouveau refreshToken different du premier', () => pm.expect(data.refreshToken).to.not.eql(pm.collectionVariables.get('refreshToken1')));",
+              "pm.collectionVariables.set('refreshToken2', data.refreshToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Rejouer refreshToken1 (deja consomme -> 401)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/refresh", "host": ["{{baseUrl}}"], "path": ["api", "auth", "refresh"] },
+        "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken1}}\"\n}" }
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('401 Unauthorized (refresh token deja utilise, en liste noire)', () => pm.response.to.have.status(401));"] } }
+      ]
+    },
+    {
+      "name": "4. Verifier que refreshToken2 (le nouveau) fonctionne toujours",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/refresh", "host": ["{{baseUrl}}"], "path": ["api", "auth", "refresh"] },
+        "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken2}}\"\n}" },
+        "description": "Confirme que la revocation cible bien le jeton consomme (refreshToken1), pas tous les jetons de l'utilisateur."
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('200 OK (refreshToken2 toujours valide)', () => pm.response.to.have.status(200));"] } }
+      ]
+    },
+    {
+      "name": "5. Login -> capture refreshToken3",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"karim.benali@pfe.local\",\n  \"motDePasse\": \"Encadrant@2026\"\n}" }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json();",
+              "pm.collectionVariables.set('refreshToken3', data.refreshToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Logout avec refreshToken3",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/logout", "host": ["{{baseUrl}}"], "path": ["api", "auth", "logout"] },
+        "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken3}}\"\n}" }
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"] } }
+      ]
+    },
+    {
+      "name": "7. Refresh avec refreshToken3 (revoque par logout -> 401)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/refresh", "host": ["{{baseUrl}}"], "path": ["api", "auth", "refresh"] },
+        "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken3}}\"\n}" }
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('401 Unauthorized (revoque par logout)', () => pm.response.to.have.status(401));"] } }
+      ]
+    },
+    {
+      "name": "8. Logout avec un refresh token deja invalide (attendu 204, pas d'erreur)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/logout", "host": ["{{baseUrl}}"], "path": ["api", "auth", "logout"] },
+        "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"jeton.invalide.test\"\n}" },
+        "description": "AuthService.deconnecter ignore silencieusement un jeton deja invalide/expire (rien a revoquer)."
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('204 No Content (pas d'erreur sur jeton invalide)', () => pm.response.to.have.status(204));"] } }
+      ]
+    }
+  ]
+}

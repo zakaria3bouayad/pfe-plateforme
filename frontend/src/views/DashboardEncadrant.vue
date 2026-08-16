@@ -9,7 +9,8 @@ const cartes = [
   { titre: 'Projets encadrés', icone: 'mdi-folder-multiple-outline', route: '/encadrant/projets' },
   { titre: 'Checkpoints', icone: 'mdi-flag-checkered', route: '/encadrant/jalons' },
   { titre: 'Livrables à commenter', icone: 'mdi-comment-text-outline', route: '/encadrant/documents' },
-  { titre: 'Discussions', icone: 'mdi-forum-outline', texte: 'Lot 5' },
+  { titre: 'Discussions', icone: 'mdi-forum-outline', route: '/encadrant/messagerie' },
+  { titre: 'Bibliothèque', icone: 'mdi-library-outline', route: '/bibliotheque' },
   { titre: 'Rapports de similarité', icone: 'mdi-file-compare', texte: 'Lot 6' },
 ]
 </script>

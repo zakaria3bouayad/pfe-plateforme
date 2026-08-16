@@ -1,0 +1,509 @@
+{
+  "info": {
+    "name": "PFE - Lot 5 Bloc B - Ressources (etape 5.6)",
+    "description": "Collection de test pour RessourceController (Lot 5, bloc B). Executer les dossiers dans l'ordre : 0. Auth, 1. Creation, 2. Consultation, 3. Edition, 4. Suppression, 5. Cas limites.\n\nComptes utilises :\n- Encadrant (auteur) : karim.benali@pfe.local / Encadrant@2026\n- Encadrant 2 (non auteur, sert au test 403 'mauvaise personne') : sophia.idrissi@pfe.local / Encadrant@2026, enregistre automatiquement par la collection s'il n'existe pas encore (0. Auth)\n- Administrateur : admin@pfe.local / Admin@2026\n- Etudiant (sert aux tests 403 'mauvais role') : yassine.alami@pfe.local / Etudiant@2026\n\nRegles testees : consultation ouverte a tout compte authentifie ; creation reservee a ENCADRANT/ADMINISTRATEUR (etudiant -> 403) ; edition/suppression reservees a l'auteur ou a un administrateur (un encadrant qui n'est pas l'auteur -> 403, meme s'il a le bon role).\n\nLes requetes 'avec fichier' necessitent d'attacher un fichier manuellement dans Body > form-data (champ 'fichier').\n\nPrerequis : ddl-auto=update le temps de creer la table ressource (a repasser sur validate + migration Flyway V4 en cloture du lot 5).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" },
+    { "key": "tokenEncadrant", "value": "" },
+    { "key": "tokenEncadrant2", "value": "" },
+    { "key": "tokenAdmin", "value": "" },
+    { "key": "tokenEtudiant", "value": "" },
+    { "key": "ressourceLienId", "value": "" },
+    { "key": "ressourceFichierId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Auth",
+      "item": [
+        {
+          "name": "Login encadrant (karim.benali)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"karim.benali@pfe.local\",\n  \"motDePasse\": \"Encadrant@2026\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenEncadrant', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login admin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@pfe.local\",\n  \"motDePasse\": \"Admin@2026\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenAdmin', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inscrire encadrant 2 (sophia.idrissi) si pas deja existant",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nom\": \"Idrissi\",\n  \"prenom\": \"Sophia\",\n  \"email\": \"sophia.idrissi@pfe.local\",\n  \"motDePasse\": \"Encadrant@2026\",\n  \"role\": \"ENCADRANT\",\n  \"specialite\": \"Genie logiciel\",\n  \"grade\": \"Professeur\",\n  \"departement\": \"Informatique\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created ou 409 Conflict (deja existant)', () => {",
+                  "  pm.expect([201, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login encadrant 2 (sophia.idrissi)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"sophia.idrissi@pfe.local\",\n  \"motDePasse\": \"Encadrant@2026\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenEncadrant2', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login etudiant (yassine.alami)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"yassine.alami@pfe.local\",\n  \"motDePasse\": \"Etudiant@2026\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenEtudiant', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Creation",
+      "item": [
+        {
+          "name": "Creer une ressource avec lien (encadrant) -> capture ressourceLienId",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources", "host": ["{{baseUrl}}"], "path": ["api", "ressources"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "titre", "value": "Guide de redaction du rapport PFE", "type": "text" },
+                { "key": "description", "value": "Trame officielle et conseils de mise en forme", "type": "text" },
+                { "key": "categorie", "value": "Methodologie", "type": "text" },
+                { "key": "lien", "value": "https://exemple.local/guide-redaction-pfe", "type": "text" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "pm.test('lien present, pas de fichier', () => { pm.expect(data.lien).to.be.a('string'); pm.expect(data.fichierNom).to.be.null; });",
+                  "pm.collectionVariables.set('ressourceLienId', data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Creer une ressource avec fichier (admin) -> capture ressourceFichierId",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources", "host": ["{{baseUrl}}"], "path": ["api", "ressources"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "titre", "value": "Modele de presentation soutenance", "type": "text" },
+                { "key": "categorie", "value": "Soutenance", "type": "text" },
+                { "key": "fichier", "type": "file", "src": [] }
+              ]
+            },
+            "description": "Attacher un fichier dans Body > form-data (champ 'fichier') avant d'envoyer."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "pm.test('fichier present', () => pm.expect(data.fichierNom).to.be.a('string'));",
+                  "pm.collectionVariables.set('ressourceFichierId', data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Creer une ressource sans lien ni fichier (attendu 400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources", "host": ["{{baseUrl}}"], "path": ["api", "ressources"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "titre", "value": "Ressource incomplete", "type": "text" },
+                { "key": "categorie", "value": "Methodologie", "type": "text" }
+              ]
+            }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('400 Bad Request (ni lien ni fichier)', () => pm.response.to.have.status(400));"] } }
+          ]
+        },
+        {
+          "name": "Creer une ressource (etudiant -> 403)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources", "host": ["{{baseUrl}}"], "path": ["api", "ressources"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "titre", "value": "Ne doit pas passer", "type": "text" },
+                { "key": "categorie", "value": "Methodologie", "type": "text" },
+                { "key": "lien", "value": "https://exemple.local/interdit", "type": "text" }
+              ]
+            }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden (role ETUDIANT)', () => pm.response.to.have.status(403));"] } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Consultation",
+      "item": [
+        {
+          "name": "Lister toutes les ressources (etudiant)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources", "host": ["{{baseUrl}}"], "path": ["api", "ressources"] },
+            "description": "Consultation ouverte a tout compte authentifie, y compris un etudiant."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('les 2 ressources creees sont presentes', () => {",
+                  "  const ids = data.map(r => r.id);",
+                  "  pm.expect(ids).to.include(parseInt(pm.collectionVariables.get('ressourceLienId')));",
+                  "  pm.expect(ids).to.include(parseInt(pm.collectionVariables.get('ressourceFichierId')));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lister par categorie (Methodologie)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/ressources?categorie=Methodologie",
+              "host": ["{{baseUrl}}"], "path": ["api", "ressources"],
+              "query": [{ "key": "categorie", "value": "Methodologie" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('toutes les ressources ont la categorie demandee', () => {",
+                  "  data.forEach(r => pm.expect(r.categorie.toLowerCase()).to.eql('methodologie'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telecharger le fichier de la ressource",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources/{{ressourceFichierId}}/telecharger", "host": ["{{baseUrl}}"], "path": ["api", "ressources", "{{ressourceFichierId}}", "telecharger"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }
+          ]
+        },
+        {
+          "name": "Telecharger une ressource sans fichier (attendu 404)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources/{{ressourceLienId}}/telecharger", "host": ["{{baseUrl}}"], "path": ["api", "ressources", "{{ressourceLienId}}", "telecharger"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('404 Not Found (pas de fichier)', () => pm.response.to.have.status(404));"] } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Edition",
+      "item": [
+        {
+          "name": "Modifier la ressource (auteur encadrant)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources/{{ressourceLienId}}", "host": ["{{baseUrl}}"], "path": ["api", "ressources", "{{ressourceLienId}}"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "titre", "value": "Guide de redaction du rapport PFE (v2)", "type": "text" },
+                { "key": "description", "value": "Version mise a jour", "type": "text" },
+                { "key": "categorie", "value": "Methodologie", "type": "text" },
+                { "key": "lien", "value": "https://exemple.local/guide-redaction-pfe-v2", "type": "text" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('titre mis a jour', () => pm.expect(data.titre).to.eql('Guide de redaction du rapport PFE (v2)'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Modifier la ressource (encadrant 2, non auteur -> 403)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant2}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources/{{ressourceLienId}}", "host": ["{{baseUrl}}"], "path": ["api", "ressources", "{{ressourceLienId}}"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "titre", "value": "Ne doit pas passer (pas l'auteur)", "type": "text" },
+                { "key": "categorie", "value": "Methodologie", "type": "text" },
+                { "key": "lien", "value": "https://exemple.local/interdit-encadrant2", "type": "text" }
+              ]
+            },
+            "description": "Meme role ENCADRANT que l'auteur, mais pas la meme personne : doit etre bloque par RessourceService.verifierAutoriseAGerer, pas par @PreAuthorize."
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden (encadrant non auteur)', () => pm.response.to.have.status(403));"] } }
+          ]
+        },
+        {
+          "name": "Modifier la ressource (admin, non auteur mais autorise)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources/{{ressourceLienId}}", "host": ["{{baseUrl}}"], "path": ["api", "ressources", "{{ressourceLienId}}"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "titre", "value": "Guide de redaction du rapport PFE (v3, admin)", "type": "text" },
+                { "key": "categorie", "value": "Methodologie", "type": "text" },
+                { "key": "lien", "value": "https://exemple.local/guide-redaction-pfe-v3", "type": "text" }
+              ]
+            }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK (admin autorise)', () => pm.response.to.have.status(200));"] } }
+          ]
+        },
+        {
+          "name": "Modifier la ressource (etudiant -> 403)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources/{{ressourceLienId}}", "host": ["{{baseUrl}}"], "path": ["api", "ressources", "{{ressourceLienId}}"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "titre", "value": "Ne doit pas passer", "type": "text" },
+                { "key": "categorie", "value": "Methodologie", "type": "text" },
+                { "key": "lien", "value": "https://exemple.local/interdit", "type": "text" }
+              ]
+            }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden (role ETUDIANT)', () => pm.response.to.have.status(403));"] } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Suppression",
+      "item": [
+        {
+          "name": "Supprimer la ressource (encadrant 2, non auteur -> 403)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant2}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources/{{ressourceFichierId}}", "host": ["{{baseUrl}}"], "path": ["api", "ressources", "{{ressourceFichierId}}"] },
+            "description": "Ressource creee par admin ; encadrant 2 n'est ni l'auteur ni administrateur -> bloque."
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden (encadrant non auteur)', () => pm.response.to.have.status(403));"] } }
+          ]
+        },
+        {
+          "name": "Supprimer la ressource avec fichier (auteur admin) -> retire aussi l'objet MinIO",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources/{{ressourceFichierId}}", "host": ["{{baseUrl}}"], "path": ["api", "ressources", "{{ressourceFichierId}}"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"] } }
+          ]
+        },
+        {
+          "name": "Verifier la suppression (telecharger -> 404)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources/{{ressourceFichierId}}/telecharger", "host": ["{{baseUrl}}"], "path": ["api", "ressources", "{{ressourceFichierId}}", "telecharger"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('404 Not Found (ressource supprimee)', () => pm.response.to.have.status(404));"] } }
+          ]
+        },
+        {
+          "name": "Supprimer la ressource restante (etudiant -> 403)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources/{{ressourceLienId}}", "host": ["{{baseUrl}}"], "path": ["api", "ressources", "{{ressourceLienId}}"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden (role ETUDIANT)', () => pm.response.to.have.status(403));"] } }
+          ]
+        },
+        {
+          "name": "Supprimer la ressource restante (auteur encadrant)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources/{{ressourceLienId}}", "host": ["{{baseUrl}}"], "path": ["api", "ressources", "{{ressourceLienId}}"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"] } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Cas limites",
+      "item": [
+        {
+          "name": "Modifier une ressource inexistante (attendu 404)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources/999999", "host": ["{{baseUrl}}"], "path": ["api", "ressources", "999999"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "titre", "value": "Test inexistant", "type": "text" },
+                { "key": "categorie", "value": "Methodologie", "type": "text" },
+                { "key": "lien", "value": "https://exemple.local/inexistant", "type": "text" }
+              ]
+            }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] } }
+          ]
+        },
+        {
+          "name": "Supprimer une ressource inexistante (attendu 404)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/ressources/999999", "host": ["{{baseUrl}}"], "path": ["api", "ressources", "999999"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] } }
+          ]
+        },
+        {
+          "name": "Lister les ressources sans token (attendu 401)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/ressources", "host": ["{{baseUrl}}"], "path": ["api", "ressources"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] } }
+          ]
+        }
+      ]
+    }
+  ]
+}

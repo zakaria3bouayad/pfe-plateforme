@@ -6,6 +6,7 @@ import com.pfe.pfe_backend.dto.*;
 import com.pfe.pfe_backend.exception.BusinessException;
 import com.pfe.pfe_backend.repository.*;
 import com.pfe.pfe_backend.security.JwtProvider;
+import com.pfe.pfe_backend.security.RefreshTokenBlacklistService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +31,7 @@ public class AuthService {
     private final EtudiantRepository etudiantRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
+    private final RefreshTokenBlacklistService refreshTokenBlacklistService;
 
     // ------------------------------------------------------------ inscription
 
@@ -124,6 +126,14 @@ public class AuthService {
 
     // ------------------------------------------------------------ refresh
 
+    /**
+     * Renouvellement avec rotation (Lot 5, bloc C) : chaque refresh token
+     * n'est utilisable qu'une seule fois. Une fois consomme ici, il est
+     * immediatement place en liste noire (Redis) ; le couple de jetons
+     * renvoye contient un nouveau refresh token qui prend le relais. Un
+     * jeton vole et deja utilise par le veritable proprietaire echoue donc
+     * au prochain essai, meme s'il n'est pas encore expire.
+     */
     @Transactional(readOnly = true)
     public AuthResponse rafraichir(RefreshRequest requete) {
 
@@ -131,6 +141,10 @@ public class AuthService {
 
         if (!jwtProvider.estRefreshTokenValide(token)) {
             throw new BusinessException("Refresh token invalide ou expire",
+                    org.springframework.http.HttpStatus.UNAUTHORIZED);
+        }
+        if (refreshTokenBlacklistService.estRevoque(token)) {
+            throw new BusinessException("Refresh token revoque",
                     org.springframework.http.HttpStatus.UNAUTHORIZED);
         }
 
@@ -142,7 +156,25 @@ public class AuthService {
             throw new DisabledException("Compte desactive");
         }
 
+        refreshTokenBlacklistService.revoquer(token);
         return genererReponse(utilisateur);
+    }
+
+    // ------------------------------------------------------------ deconnexion
+
+    /**
+     * Deconnexion explicite (Lot 5, bloc C) : revoque le refresh token
+     * fourni pour qu'il ne puisse plus servir a /refresh. L'access token
+     * deja emis reste valide jusqu'a son expiration naturelle (15 min) :
+     * c'est la limite acceptee de ce mecanisme, coherent avec l'absence
+     * d'etat serveur pour les access tokens (ENF-07).
+     */
+    public void deconnecter(RefreshRequest requete) {
+        String token = requete.refreshToken();
+        if (jwtProvider.estRefreshTokenValide(token)) {
+            refreshTokenBlacklistService.revoquer(token);
+        }
+        // Jeton deja invalide/expire : rien a faire, il ne pourrait de toute facon plus servir.
     }
 
     // ------------------------------------------------------------ commun

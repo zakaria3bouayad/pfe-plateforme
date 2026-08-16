@@ -17,9 +17,11 @@ import java.util.List;
 /**
  * Constitution et consultation des equipes d'etudiants (EF-11).
  *
- * Consultation ouverte a tout compte authentifie. Creation et gestion des
- * membres reservees a l'etudiant chef d'equipe ; la dissolution peut aussi
- * etre faite par un administrateur.
+ * Consultation ouverte a tout compte authentifie. Creation reservee a
+ * l'etudiant chef d'equipe. Ajout d'un membre : par le chef (numero
+ * etudiant) ou par le candidat lui-meme (auto-inscription, hors plan
+ * initial) ; retrait reserve au chef. La dissolution peut aussi etre faite
+ * par un administrateur.
  */
 @RestController
 @RequestMapping("/api/equipes")
@@ -60,6 +62,13 @@ public class EquipeController {
             Authentication authentication,
             @Valid @RequestBody AjoutMembreRequest requete) {
         return ResponseEntity.ok(equipeService.ajouterMembre(id, authentication.getName(), requete));
+    }
+
+    /** Auto-inscription : un etudiant sans equipe rejoint lui-meme une equipe existante (hors plan initial). */
+    @PostMapping("/{id}/rejoindre")
+    @PreAuthorize("hasRole('ETUDIANT')")
+    public ResponseEntity<EquipeDto> rejoindre(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(equipeService.rejoindre(id, authentication.getName()));
     }
 
     /** Le membre connecte quitte l'equipe (le chef doit dissoudre plutot que quitter). */

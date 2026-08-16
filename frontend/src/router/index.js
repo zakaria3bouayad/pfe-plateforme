@@ -54,6 +54,12 @@ const routes = [
     meta: { roles: ['ETUDIANT'] },
   },
   {
+    path: '/etudiant/messagerie',
+    name: 'etudiant-messagerie',
+    component: () => import('@/views/EtudiantMessagerieView.vue'),
+    meta: { roles: ['ETUDIANT'] },
+  },
+  {
     path: '/encadrant',
     name: 'dashboard-encadrant',
     component: () => import('@/views/DashboardEncadrant.vue'),
@@ -81,6 +87,12 @@ const routes = [
     path: '/encadrant/documents',
     name: 'encadrant-documents',
     component: () => import('@/views/EncadrantDocumentsView.vue'),
+    meta: { roles: ['ENCADRANT'] },
+  },
+  {
+    path: '/encadrant/messagerie',
+    name: 'encadrant-messagerie',
+    component: () => import('@/views/EncadrantMessagerieView.vue'),
     meta: { roles: ['ENCADRANT'] },
   },
   {
@@ -118,6 +130,13 @@ const routes = [
     name: 'admin-stats',
     component: () => import('@/views/AdminStatsView.vue'),
     meta: { roles: ['ADMINISTRATEUR'] },
+  },
+
+  {
+    path: '/bibliotheque',
+    name: 'bibliotheque',
+    component: () => import('@/views/BibliothequeView.vue'),
+    meta: { roles: ['ETUDIANT', 'ENCADRANT', 'ADMINISTRATEUR'] },
   },
 
   { path: '/:pathMatch(.*)*', redirect: '/login' },

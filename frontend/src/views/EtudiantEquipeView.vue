@@ -7,8 +7,11 @@ import { useAuthStore } from '@/stores/authStore'
 const auth = useAuthStore()
 
 const equipe = ref(null)
+const equipesDisponibles = ref([])
 const chargement = ref(true)
 const erreur = ref(null)
+const succes = ref(null)
+const rejoindreEnCours = ref(null)
 
 const dialogueCreation = ref(false)
 const formulaireValide = ref(false)
@@ -20,6 +23,11 @@ const obligatoire = [(v) => !!v || 'Champ obligatoire']
 
 const estChef = computed(() => equipe.value && equipe.value.chefId === auth.utilisateur?.id)
 
+/** Equipes pas encore pleines : proposees pour l'auto-inscription (hors plan initial). */
+const equipesRejoignables = computed(() =>
+  equipesDisponibles.value.filter((e) => e.membres.length < e.tailleMax),
+)
+
 async function charger() {
   chargement.value = true
   erreur.value = null
@@ -29,6 +37,7 @@ async function charger() {
   } catch (e) {
     if (e.response?.status === 404) {
       equipe.value = null
+      await chargerEquipesDisponibles()
     } else {
       erreur.value = messageErreur(e)
     }
@@ -37,7 +46,32 @@ async function charger() {
   }
 }
 
+async function chargerEquipesDisponibles() {
+  try {
+    const { data } = await api.get('/equipes')
+    equipesDisponibles.value = data
+  } catch (e) {
+    erreur.value = messageErreur(e)
+  }
+}
+
 onMounted(charger)
+
+async function rejoindre(equipeAJoindre) {
+  if (!confirm(`Rejoindre l'équipe « ${equipeAJoindre.nom} » ?`)) return
+  rejoindreEnCours.value = equipeAJoindre.id
+  erreur.value = null
+  succes.value = null
+  try {
+    await api.post(`/equipes/${equipeAJoindre.id}/rejoindre`)
+    succes.value = `Vous avez rejoint « ${equipeAJoindre.nom} ».`
+    await charger()
+  } catch (e) {
+    erreur.value = messageErreur(e)
+  } finally {
+    rejoindreEnCours.value = null
+  }
+}
 
 async function creer() {
   if (!formulaireValide.value) return
@@ -107,13 +141,44 @@ async function dissoudre() {
     </div>
 
     <v-alert v-if="erreur" type="error" variant="tonal" density="compact" class="mb-4" :text="erreur" />
+    <v-alert v-if="succes" type="success" variant="tonal" density="compact" class="mb-4" :text="succes" />
 
     <v-progress-linear v-if="chargement" indeterminate color="primary" class="mb-4" />
 
-    <v-alert v-if="!chargement && !equipe" type="info" variant="tonal">
-      Vous n'appartenez à aucune équipe pour l'instant. Créez-en une, ou demandez au chef d'une équipe
-      existante de vous ajouter via votre numéro étudiant.
-    </v-alert>
+    <template v-if="!chargement && !equipe">
+      <v-alert type="info" variant="tonal" class="mb-4">
+        Vous n'appartenez à aucune équipe pour l'instant. Créez-en une, ou rejoignez directement une
+        équipe existante ci-dessous (de votre filière et promotion, sous réserve de place disponible).
+      </v-alert>
+
+      <v-alert v-if="equipesRejoignables.length === 0" type="info" variant="tonal" density="compact">
+        Aucune équipe avec de la place disponible pour l'instant.
+      </v-alert>
+
+      <v-list v-else density="comfortable" lines="two" class="mb-4">
+        <v-list-item
+          v-for="e in equipesRejoignables"
+          :key="e.id"
+          :title="e.nom"
+          :subtitle="`Chef : ${e.chefNom} · ${e.membres.length}/${e.tailleMax} membres`"
+        >
+          <template #prepend>
+            <v-icon icon="mdi-account-group-outline" />
+          </template>
+          <template #append>
+            <v-btn
+              size="small"
+              color="primary"
+              variant="tonal"
+              :loading="rejoindreEnCours === e.id"
+              @click="rejoindre(e)"
+            >
+              Rejoindre
+            </v-btn>
+          </template>
+        </v-list-item>
+      </v-list>
+    </template>
 
     <v-card v-if="equipe" variant="outlined" rounded="lg">
       <v-card-item>

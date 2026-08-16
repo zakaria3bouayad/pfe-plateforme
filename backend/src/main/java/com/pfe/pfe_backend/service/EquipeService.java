@@ -19,9 +19,11 @@ import java.util.List;
  * Constitution et gestion des equipes d'etudiants (EF-11).
  *
  * Un etudiant appartient a au plus une equipe a la fois (Etudiant.equipe).
- * Le chef est celui qui a cree l'equipe ; il est seul habilite a en gerer
- * les membres, et ne peut la quitter que via dissoudre(). L'affectation
- * d'un sujet a une equipe fait l'objet d'une etape ulterieure du lot 2.
+ * Le chef est celui qui a cree l'equipe ; il est seul habilite a en retirer
+ * des membres, et ne peut la quitter que via dissoudre(). L'ajout d'un
+ * membre peut venir soit du chef (ajouterMembre), soit du candidat
+ * lui-meme (rejoindre, hors plan initial). L'affectation d'un sujet a une
+ * equipe fait l'objet d'une etape ulterieure du lot 2.
  */
 @Service
 @RequiredArgsConstructor
@@ -91,6 +93,37 @@ public class EquipeService {
 
         if (etudiantRepository.countByEquipeId(equipeId) >= equipe.getTailleMax()) {
             throw BusinessException.conflit("L'equipe a atteint sa taille maximale");
+        }
+
+        candidat.setEquipe(equipe);
+        return versDto(equipe);
+    }
+
+    /**
+     * Auto-inscription (hors plan, ajoute a la demande de Zakaria) : un
+     * etudiant sans equipe peut rejoindre lui-meme une equipe existante,
+     * sans passer par le chef. Memes regles metier que ajouterMembre (meme
+     * filiere/promotion que le chef, equipe pas pleine), initiees par le
+     * candidat plutot que par le chef.
+     */
+    @Transactional
+    public EquipeDto rejoindre(Long equipeId, String emailEtudiant) {
+        Equipe equipe = trouverEntite(equipeId);
+        Etudiant candidat = trouverEtudiant(emailEtudiant);
+
+        if (candidat.getEquipe() != null) {
+            throw BusinessException.conflit("Vous appartenez deja a une equipe");
+        }
+
+        Etudiant chef = equipe.getChef();
+        if (!candidat.getFiliere().getId().equals(chef.getFiliere().getId())
+                || !candidat.getPromotion().getId().equals(chef.getPromotion().getId())) {
+            throw new BusinessException(
+                    "Vous devez etre de la meme filiere et de la meme promotion que cette equipe");
+        }
+
+        if (etudiantRepository.countByEquipeId(equipeId) >= equipe.getTailleMax()) {
+            throw BusinessException.conflit("Cette equipe a atteint sa taille maximale");
         }
 
         candidat.setEquipe(equipe);
