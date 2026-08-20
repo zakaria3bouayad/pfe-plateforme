@@ -6,6 +6,10 @@ import java.time.LocalDateTime;
 
 /**
  * Representation d'un document renvoyee au frontend (Lot 4, bloc A).
+ *
+ * Enrichie au lot 6 (etape 6.1) des trois champs d'archivage : le frontend
+ * peut ainsi afficher le marqueur "rapport de reference" partout ou une liste
+ * de documents est deja rendue, sans DTO supplementaire.
  */
 public record DocumentDto(
         Long id,
@@ -17,7 +21,10 @@ public record DocumentDto(
         Long etapeId,
         Long uploadeurId,
         String uploadeurNom,
-        LocalDateTime dateUpload
+        LocalDateTime dateUpload,
+        boolean archive,
+        LocalDateTime dateArchivage,
+        String archiveParNom
 ) {
     public static DocumentDto from(Document d) {
         return new DocumentDto(
@@ -30,7 +37,10 @@ public record DocumentDto(
                 d.getEtape() != null ? d.getEtape().getId() : null,
                 d.getUploadeur().getId(),
                 d.getUploadeur().getNomComplet(),
-                d.getDateUpload()
+                d.getDateUpload(),
+                d.isArchive(),
+                d.getDateArchivage(),
+                d.getArchivePar() != null ? d.getArchivePar().getNomComplet() : null
         );
     }
 }

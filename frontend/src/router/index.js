@@ -96,6 +96,16 @@ const routes = [
     meta: { roles: ['ENCADRANT'] },
   },
   {
+    // Lot 6, etape 6.7. Reserve a l'encadrant : l'etudiant n'a acces a aucun
+    // rapport de similarite, pas meme sur ses propres documents (cf.
+    // SimilariteController). La garde ci-dessous n'est qu'un confort
+    // d'interface, la restriction reelle est appliquee cote serveur.
+    path: '/encadrant/similarite',
+    name: 'encadrant-similarite',
+    component: () => import('@/views/EncadrantSimilariteView.vue'),
+    meta: { roles: ['ENCADRANT'] },
+  },
+  {
     path: '/admin',
     name: 'dashboard-admin',
     component: () => import('@/views/DashboardAdmin.vue'),
@@ -129,6 +139,13 @@ const routes = [
     path: '/admin/stats',
     name: 'admin-stats',
     component: () => import('@/views/AdminStatsView.vue'),
+    meta: { roles: ['ADMINISTRATEUR'] },
+  },
+  {
+    // Lot 6, etape 6.8. Constitution et surveillance du corpus de reference.
+    path: '/admin/archives',
+    name: 'admin-archives',
+    component: () => import('@/views/AdminArchivesView.vue'),
     meta: { roles: ['ADMINISTRATEUR'] },
   },
 

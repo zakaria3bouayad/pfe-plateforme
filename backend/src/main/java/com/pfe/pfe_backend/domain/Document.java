@@ -28,7 +28,8 @@ import java.time.LocalDateTime;
         indexes = {
                 @Index(name = "idx_document_projet", columnList = "projet_id"),
                 @Index(name = "idx_document_etape", columnList = "etape_id"),
-                @Index(name = "idx_document_projet_nom_etape", columnList = "projet_id,nom,etape_id")
+                @Index(name = "idx_document_projet_nom_etape", columnList = "projet_id,nom,etape_id"),
+                @Index(name = "idx_document_archive", columnList = "archive")
         }
 )
 @Getter
@@ -101,6 +102,28 @@ public class Document {
 
     @Column(name = "date_suppression")
     private LocalDateTime dateSuppression;
+
+    /**
+     * Marque le document comme rapport final de reference (Lot 6, etape 6.1).
+     *
+     * Seuls les documents portant ce marqueur forment le corpus de comparaison
+     * du detecteur de similarite : les documents simplement deposes sur un
+     * projet n'y entrent pas. Le marquage est reserve a l'administrateur et
+     * reste reversible (aucune donnee n'est perdue au demarquage).
+     */
+    @Column(name = "archive", nullable = false)
+    private boolean archive;
+
+    /** Date du dernier marquage comme archive de reference (null si jamais archive ou apres demarquage). */
+    @Column(name = "date_archivage")
+    private LocalDateTime dateArchivage;
+
+    /** Administrateur ayant effectue le dernier marquage (null si jamais archive ou apres demarquage). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "archive_par_id",
+            foreignKey = @ForeignKey(name = "fk_document_archive_par"))
+    private Utilisateur archivePar;
 
     @PrePersist
     protected void onCreate() {

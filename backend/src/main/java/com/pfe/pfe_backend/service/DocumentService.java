@@ -4,6 +4,7 @@ import com.pfe.pfe_backend.domain.Document;
 import com.pfe.pfe_backend.domain.Etape;
 import com.pfe.pfe_backend.domain.Etudiant;
 import com.pfe.pfe_backend.domain.Projet;
+import com.pfe.pfe_backend.domain.Utilisateur;
 import com.pfe.pfe_backend.dto.DocumentDto;
 import com.pfe.pfe_backend.dto.DocumentTelechargement;
 import com.pfe.pfe_backend.exception.BusinessException;
@@ -11,6 +12,7 @@ import com.pfe.pfe_backend.repository.DocumentRepository;
 import com.pfe.pfe_backend.repository.EtapeRepository;
 import com.pfe.pfe_backend.repository.EtudiantRepository;
 import com.pfe.pfe_backend.repository.ProjetRepository;
+import com.pfe.pfe_backend.repository.UtilisateurRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -41,7 +43,9 @@ public class DocumentService {
     private final ProjetRepository projetRepository;
     private final EtapeRepository etapeRepository;
     private final EtudiantRepository etudiantRepository;
+    private final UtilisateurRepository utilisateurRepository;
     private final DocumentStorageService documentStorageService;
+    private final IndexationService indexationService;
 
     @Transactional(readOnly = true)
     public List<DocumentDto> listerParProjet(Long projetId) {
@@ -127,6 +131,61 @@ public class DocumentService {
         documentStorageService.supprimerObjet(document.getCheminMinio());
         document.setSupprime(true);
         document.setDateSuppression(LocalDateTime.now());
+
+        // Le fichier vient d'etre reellement retire de MinIO : conserver son
+        // texte extrait serait incoherent avec la suppression, et le laisser
+        // dans le corpus de similarite ferait remonter des rapprochements
+        // avec un document que plus personne ne peut consulter (Lot 6, 6.2).
+        document.setArchive(false);
+        document.setDateArchivage(null);
+        document.setArchivePar(null);
+        indexationService.supprimerIndexation(document.getId());
+    }
+
+    // -------------------------------------------- archivage (Lot 6, etape 6.1)
+
+    /**
+     * Marque ou demarque un document comme rapport de reference archive.
+     *
+     * Reserve a l'administrateur (verifie au niveau du controleur et de
+     * SecurityConfig). Idempotent : reappliquer le meme etat ne provoque pas
+     * d'erreur, seule la tracabilite est rafraichie. Un document supprime
+     * logiquement ne peut pas etre archive : son objet MinIO n'existe plus,
+     * l'extraction de texte de l'etape 6.2 echouerait.
+     *
+     * Le marquage declenche immediatement l'indexation du document (6.2) :
+     * une archive sans texte extrait ne servirait a rien au detecteur de
+     * similarite. L'echec eventuel de l'extraction n'annule pas le marquage,
+     * il est enregistre dans l'indexation et reste rattrapable via
+     * POST /api/admin/documents/{id}/indexer. Le demarquage supprime
+     * l'indexation, qui n'a plus de raison d'exister.
+     */
+    @Transactional
+    public DocumentDto changerArchive(String emailAdministrateur, Long documentId, boolean archive) {
+        Document document = trouverActif(documentId);
+
+        if (archive) {
+            Utilisateur administrateur = utilisateurRepository.findByEmail(emailAdministrateur)
+                    .orElseThrow(() -> BusinessException.introuvable("Utilisateur introuvable"));
+            document.setArchive(true);
+            document.setDateArchivage(LocalDateTime.now());
+            document.setArchivePar(administrateur);
+            indexationService.indexer(document);
+        } else {
+            document.setArchive(false);
+            document.setDateArchivage(null);
+            document.setArchivePar(null);
+            indexationService.supprimerIndexation(documentId);
+        }
+
+        return DocumentDto.from(document);
+    }
+
+    /** Corpus de reference : tous les documents archives actifs, du plus recemment archive au plus ancien. */
+    @Transactional(readOnly = true)
+    public List<DocumentDto> listerArchives() {
+        return documentRepository.findByArchiveTrueAndSupprimeFalseOrderByDateArchivageDesc().stream()
+                .map(DocumentDto::from).toList();
     }
 
     // ------------------------------------------------------------ prive

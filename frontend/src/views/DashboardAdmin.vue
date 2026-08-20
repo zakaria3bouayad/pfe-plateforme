@@ -10,6 +10,7 @@ const cartes = [
   { titre: 'Validation des sujets', icone: 'mdi-check-circle-outline', route: '/admin/sujets' },
   { titre: 'Tous les projets', icone: 'mdi-folder-multiple-outline', route: '/admin/projets' },
   { titre: 'Statistiques', icone: 'mdi-chart-box-outline', route: '/admin/stats' },
+  { titre: 'Corpus de référence', icone: 'mdi-archive-outline', route: '/admin/archives' },
   { titre: 'Bibliothèque', icone: 'mdi-library-outline', route: '/bibliotheque' },
   { titre: "Journal d'audit", icone: 'mdi-shield-search', texte: 'Lot 7' },
 ]

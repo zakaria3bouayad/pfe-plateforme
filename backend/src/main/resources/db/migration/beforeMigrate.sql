@@ -1,0 +1,17 @@
+-- Callback Flyway execute avant les migrations, a chaque demarrage
+-- (Lot 6, etape 6.3).
+--
+-- L'extension pgvector doit exister avant toute creation de colonne de type
+-- vector, qu'elle vienne d'une migration versionnee ou de ddl-auto pendant
+-- le developpement. Un callback beforeMigrate est le seul emplacement qui
+-- garantit cet ordre.
+--
+-- Pourquoi ici plutot que dans la migration V5 : une migration versionnee ne
+-- s'execute qu'une fois, sur les bases qui ne l'ont pas encore appliquee.
+-- Ce callback, lui, s'execute a chaque demarrage et rend l'installation
+-- reproductible - un clone du depot demarre sans commande manuelle
+-- prealable. L'operation est idempotente et sans cout mesurable.
+--
+-- L'image pgvector/pgvector:pg16 du docker-compose fournit deja les
+-- binaires : il ne reste qu'a activer l'extension dans la base.
+CREATE EXTENSION IF NOT EXISTS vector;

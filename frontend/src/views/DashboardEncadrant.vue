@@ -11,7 +11,7 @@ const cartes = [
   { titre: 'Livrables à commenter', icone: 'mdi-comment-text-outline', route: '/encadrant/documents' },
   { titre: 'Discussions', icone: 'mdi-forum-outline', route: '/encadrant/messagerie' },
   { titre: 'Bibliothèque', icone: 'mdi-library-outline', route: '/bibliotheque' },
-  { titre: 'Rapports de similarité', icone: 'mdi-file-compare', texte: 'Lot 6' },
+  { titre: 'Rapports de similarité', icone: 'mdi-file-compare', route: '/encadrant/similarite' },
 ]
 </script>
 

@@ -1,0 +1,346 @@
+{
+  "info": {
+    "name": "PFE - Lot 6 Bloc A - Archivage et indexation (etapes 6.1 a 6.3)",
+    "description": "Collection de test pour le marquage d'un document comme rapport de reference archive (6.1), l'extraction de son texte via PDFBox (6.2) et sa vectorisation via l'API Gemini (6.3). Executer les requetes dans l'ordre.\n\nCompte utilise : admin@pfe.local / Admin@2026 (DataInitializer)\n\nPREREQUIS\n1. docker compose up -d\n2. Extension pgvector creee :\n   docker exec pfe-db psql -U pfe -d pfe_db -c \"CREATE EXTENSION IF NOT EXISTS vector;\"\n3. Cle API Gemini renseignee dans backend/src/main/resources/application-local.properties (non versionne)\n4. Au moins un document PDF non supprime en base. Pour en trouver l'id :\n   docker exec pfe-db psql -U pfe -d pfe_db -c \"SELECT id, nom, type FROM document WHERE type LIKE '%pdf%' AND supprime = false;\"\n   Renseigner ensuite la variable documentId ci-dessous.\n\nATTENTION : la requete 3 (marquage) declenche l'extraction PUIS un appel Gemini par morceau de texte. Elle peut durer 1 a 2 minutes sur un rapport de 100 pages. C'est normal, ne pas l'annuler.\n\nSCENARIO\n1. Login admin -> capture accessToken\n2. Etat initial : document non archive\n3. Marquage comme archive -> declenche extraction + vectorisation\n4. Consultation de l'indexation -> statut VECTORISE attendu\n5. Le document apparait dans le corpus\n6. Reindexation manuelle (rattrapage d'un echec)\n7. Marquage idempotent (re-marquer ne casse rien)\n8. Demarquage -> l'indexation disparait\n9. Indexation d'un document demarque -> 404\n10. Acces refuse a un encadrant (endpoint reserve a l'admin)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" },
+    { "key": "documentId", "value": "1" },
+    { "key": "accessToken", "value": "" },
+    { "key": "tokenEncadrant", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Login admin -> capture accessToken",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@pfe.local\",\n  \"motDePasse\": \"Admin@2026\"\n}" }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json();",
+              "pm.collectionVariables.set('accessToken', data.accessToken);",
+              "pm.test('role ADMINISTRATEUR', () => pm.expect(data.utilisateur.role).to.eql('ADMINISTRATEUR'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Corpus initial (avant tout marquage)",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/documents/archives",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "documents", "archives"]
+        },
+        "description": "Etat de reference : le document teste ne doit pas encore y figurer."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const id = Number(pm.collectionVariables.get('documentId'));",
+              "const archives = pm.response.json();",
+              "pm.test('le document teste n est pas encore archive', () => pm.expect(archives.some(d => d.id === id)).to.be.false);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Marquer comme archive (declenche extraction + vectorisation) - LENT",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/documents/{{documentId}}/archive",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "documents", "{{documentId}}", "archive"]
+        },
+        "body": { "mode": "raw", "raw": "{\n  \"archive\": true\n}" },
+        "description": "Peut durer 1 a 2 minutes : un appel Gemini par morceau de texte."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const d = pm.response.json();",
+              "pm.test('archive = true', () => pm.expect(d.archive).to.be.true);",
+              "pm.test('dateArchivage renseignee', () => pm.expect(d.dateArchivage).to.not.be.null);",
+              "pm.test('archivePar renseigne (tracabilite)', () => pm.expect(d.archiveParNom).to.not.be.null);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Consulter l'indexation -> VECTORISE attendu",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/documents/{{documentId}}/indexation",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "documents", "{{documentId}}", "indexation"]
+        },
+        "description": "Coeur du test. VECTORISE = texte extrait ET vecteurs calcules.\n\nAutres statuts possibles :\n- EXTRAIT : texte ok, vectorisation pas encore faite\n- ECHEC_EMBEDDING : API Gemini en erreur, cause dans 'message'\n- VIDE : PDF sans couche texte (scanne), pas d'OCR prevu\n- TYPE_NON_SUPPORTE : le document n'est pas un PDF\n- ECHEC : PDF illisible ou objet MinIO inaccessible"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const i = pm.response.json();",
+              "console.log('statut =', i.statut, '| caracteres =', i.nbCaracteres, '| morceaux =', i.nbMorceaux);",
+              "if (i.statut !== 'VECTORISE') { console.log('message =', i.message); }",
+              "pm.test('statut VECTORISE', () => pm.expect(i.statut).to.eql('VECTORISE'));",
+              "pm.test('du texte a ete extrait', () => pm.expect(i.nbCaracteres).to.be.above(0));",
+              "pm.test('au moins un morceau vectorise', () => pm.expect(i.nbMorceaux).to.be.above(0));",
+              "pm.test('apercu lisible (extraction PDFBox correcte)', () => pm.expect(i.apercu).to.be.a('string').and.not.empty);",
+              "pm.test('aucun message d erreur', () => pm.expect(i.message).to.be.null);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Le document figure dans le corpus",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/documents/archives",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "documents", "archives"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const id = Number(pm.collectionVariables.get('documentId'));",
+              "const archives = pm.response.json();",
+              "pm.test('le document est desormais dans le corpus', () => pm.expect(archives.some(d => d.id === id)).to.be.true);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Reindexation manuelle (rattrapage) - LENT",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/documents/{{documentId}}/indexer",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "documents", "{{documentId}}", "indexer"]
+        },
+        "description": "Sert a rejouer une vectorisation en ECHEC_EMBEDDING sans devoir demarquer puis remarquer le document. Les morceaux precedents sont supprimes avant recalcul : le nombre de morceaux doit rester identique a la requete 4."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const i = pm.response.json();",
+              "pm.test('statut VECTORISE', () => pm.expect(i.statut).to.eql('VECTORISE'));",
+              "pm.test('morceaux recalcules', () => pm.expect(i.nbMorceaux).to.be.above(0));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Re-marquer un document deja archive (idempotent, pas de 409) - LENT",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/documents/{{documentId}}/archive",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "documents", "{{documentId}}", "archive"]
+        },
+        "body": { "mode": "raw", "raw": "{\n  \"archive\": true\n}" },
+        "description": "Choix assume : PATCH d'etat idempotent, comme PATCH /api/admin/utilisateurs/{id}/actif. Reappliquer le meme etat rafraichit la tracabilite sans lever d'erreur."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK (idempotent)', () => pm.response.to.have.status(200));",
+              "pm.test('toujours archive', () => pm.expect(pm.response.json().archive).to.be.true);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Corps de requete sans le champ archive -> 400",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/documents/{{documentId}}/archive",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "documents", "{{documentId}}", "archive"]
+        },
+        "body": { "mode": "raw", "raw": "{}" },
+        "description": "ArchiveDocumentRequest declare un Boolean objet annote @NotNull : un champ absent est rejete plutot qu'interprete comme un demarquage."
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('400 Bad Request (champ archive obligatoire)', () => pm.response.to.have.status(400));"] } }
+      ]
+    },
+    {
+      "name": "9. Demarquer le document",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/documents/{{documentId}}/archive",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "documents", "{{documentId}}", "archive"]
+        },
+        "body": { "mode": "raw", "raw": "{\n  \"archive\": false\n}" },
+        "description": "Le demarquage remet dateArchivage et archivePar a null, et supprime l'indexation ainsi que ses morceaux."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const d = pm.response.json();",
+              "pm.test('archive = false', () => pm.expect(d.archive).to.be.false);",
+              "pm.test('dateArchivage remise a null', () => pm.expect(d.dateArchivage).to.be.null);",
+              "pm.test('archivePar remis a null', () => pm.expect(d.archiveParNom).to.be.null);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Indexation d'un document demarque -> 404",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/documents/{{documentId}}/indexation",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "documents", "{{documentId}}", "indexation"]
+        },
+        "description": "Confirme que le demarquage a bien supprime l'indexation : le document ne pese plus dans le corpus."
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('404 Not Found (indexation supprimee au demarquage)', () => pm.response.to.have.status(404));"] } }
+      ]
+    },
+    {
+      "name": "11. Sans jeton -> 401",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/documents/archives",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "documents", "archives"]
+        }
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] } }
+      ]
+    },
+    {
+      "name": "12. Login encadrant -> capture tokenEncadrant",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"karim.benali@pfe.local\",\n  \"motDePasse\": \"Encadrant@2026\"\n}" },
+        "description": "Adapter l'email si ce compte n'existe pas dans ta base."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set('tokenEncadrant', pm.response.json().accessToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Archivage par un encadrant -> 403",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/documents/{{documentId}}/archive",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "documents", "{{documentId}}", "archive"]
+        },
+        "body": { "mode": "raw", "raw": "{\n  \"archive\": true\n}" },
+        "description": "Le prefixe /api/admin est verrouille sur ADMINISTRATEUR par SecurityConfig, et chaque methode porte en plus un @PreAuthorize."
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden (reserve a l administrateur)', () => pm.response.to.have.status(403));"] } }
+      ]
+    },
+    {
+      "name": "14. Document inexistant -> 404",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/documents/999999/archive",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "documents", "999999", "archive"]
+        },
+        "body": { "mode": "raw", "raw": "{\n  \"archive\": true\n}" }
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] } }
+      ]
+    }
+  ]
+}

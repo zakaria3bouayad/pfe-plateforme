@@ -1,0 +1,453 @@
+{
+  "info": {
+    "name": "PFE - Lot 6 Bloc B - Detection de similarite (etapes 6.4 et 6.5)",
+    "description": "Collection de test du detecteur de similarite. Executer les requetes dans l'ordre.\n\nPREREQUIS\n1. Collection Lot6-BlocA passee avec succes (extraction et vectorisation operationnelles)\n2. Les trois PDF de docs/pdf-test deposes sur un projet, et leurs ids renseignes dans les variables :\n     documentIdA -> rapport-A-reference.pdf  (sera archive : c'est le corpus)\n     documentIdB -> rapport-B-suspect.pdf    (partage 4 sections mot pour mot avec A)\n     documentIdC -> rapport-C-sans-lien.pdf  (aucun lien thematique)\n3. projetId renseigne\n4. Comptes encadrant et etudiant existants : adapter emails et mots de passe si besoin\n\nATTENTION : les requetes marquees LENT declenchent des appels a l'API Gemini (un par morceau). Compter 30 a 90 secondes chacune.\n\nOBJECTIF DE CALIBRAGE\nLa requete 12 compare les scores de B et de C. C'est elle qui donne les chiffres reels permettant de regler similarite.seuil.suspect et similarite.seuil.attention. Les valeurs 0,90 et 0,80 sont des points de depart, pas un reglage definitif : lire la console Postman apres execution.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" },
+    { "key": "projetId", "value": "1" },
+    { "key": "documentIdA", "value": "1" },
+    { "key": "documentIdB", "value": "2" },
+    { "key": "documentIdC", "value": "3" },
+    { "key": "tokenAdmin", "value": "" },
+    { "key": "tokenEncadrant", "value": "" },
+    { "key": "tokenEtudiant", "value": "" },
+    { "key": "rapportIdB", "value": "" },
+    { "key": "scoreB", "value": "" },
+    { "key": "scoreC", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Login admin",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@pfe.local\",\n  \"motDePasse\": \"Admin@2026\"\n}" }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set('tokenAdmin', pm.response.json().accessToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Login encadrant du projet",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"karim.benali@pfe.local\",\n  \"motDePasse\": \"Encadrant@2026\"\n}" },
+        "description": "Doit etre l'encadrant du projet contenant les documents testes : SimilariteService verifie ce lien, pas seulement le role."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set('tokenEncadrant', pm.response.json().accessToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Archiver le rapport A (constitue le corpus) - LENT",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/documents/{{documentIdA}}/archive",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "documents", "{{documentIdA}}", "archive"]
+        },
+        "body": { "mode": "raw", "raw": "{\n  \"archive\": true\n}" }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('archive = true', () => pm.expect(pm.response.json().archive).to.be.true);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Verifier que A est vectorise",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/documents/{{documentIdA}}/indexation",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "documents", "{{documentIdA}}", "indexation"]
+        },
+        "description": "Sans corpus vectorise, toutes les analyses suivantes renverraient un rapport non concluant."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const i = pm.response.json();",
+              "console.log('CORPUS A : statut', i.statut, '| caracteres', i.nbCaracteres, '| morceaux', i.nbMorceaux);",
+              "pm.test('statut VECTORISE', () => pm.expect(i.statut).to.eql('VECTORISE'));",
+              "pm.test('au moins un morceau', () => pm.expect(i.nbMorceaux).to.be.above(0));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Analyser le rapport B (suspect) - LENT",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/documents/{{documentIdB}}/similarite",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "documents", "{{documentIdB}}", "similarite"]
+        },
+        "description": "B reprend quatre sections de A mot pour mot. Le score maximum doit etre nettement plus eleve que celui de C (requete 8)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('201 Created (nouveau rapport, pas ecrasement)', () => pm.response.to.have.status(201));",
+              "const r = pm.response.json();",
+              "pm.collectionVariables.set('rapportIdB', r.id);",
+              "pm.collectionVariables.set('scoreB', r.scoreMax);",
+              "console.log('RAPPORT B : score', r.scoreMax, '(' + r.pourcentageMax + '%) | niveau', r.niveau, '| archives comparees', r.nbDocumentsCompares);",
+              "if (r.correspondances && r.correspondances.length) {",
+              "  console.log('  meilleur rapprochement ->', r.correspondances[0].documentArchiveNom, 'score', r.correspondances[0].score);",
+              "  console.log('  extrait analyse :', String(r.correspondances[0].extraitAnalyse).slice(0, 160));",
+              "}",
+              "pm.test('corpus non vide', () => pm.expect(r.nbDocumentsCompares).to.be.above(0));",
+              "pm.test('au moins une correspondance', () => pm.expect(r.correspondances.length).to.be.above(0));",
+              "pm.test('avertissement present (rapport non probant par nature)', () => pm.expect(r.avertissement).to.be.a('string').and.not.empty);",
+              "pm.test('seuils figes dans le rapport', () => { pm.expect(r.seuilSuspect).to.be.a('number'); pm.expect(r.seuilAttention).to.be.a('number'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Consulter le dernier rapport de B",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/documents/{{documentIdB}}/similarite",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "documents", "{{documentIdB}}", "similarite"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const r = pm.response.json();",
+              "pm.test('meme rapport que celui cree', () => pm.expect(String(r.id)).to.eql(String(pm.collectionVariables.get('rapportIdB'))));",
+              "pm.test('extraits presents (verifiables a la main)', () => pm.expect(r.correspondances[0].extraitArchive).to.be.a('string').and.not.empty);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Consulter le rapport par son identifiant",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/similarites/{{rapportIdB}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "similarites", "{{rapportIdB}}"]
+        }
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }
+      ]
+    },
+    {
+      "name": "8. Analyser le rapport C (sans lien) - LENT",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/documents/{{documentIdC}}/similarite",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "documents", "{{documentIdC}}", "similarite"]
+        },
+        "description": "Controle negatif : C traite de rehabilitation energetique, sans rapport avec A. Son score sert de plancher de reference."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const r = pm.response.json();",
+              "pm.collectionVariables.set('scoreC', r.scoreMax);",
+              "console.log('RAPPORT C : score', r.scoreMax, '(' + r.pourcentageMax + '%) | niveau', r.niveau);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Historique des analyses de B",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/documents/{{documentIdB}}/similarite/historique",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "documents", "{{documentIdB}}", "similarite", "historique"]
+        },
+        "description": "Le resume ne transporte pas les correspondances : listes plus legeres, extraits non diffuses inutilement."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const liste = pm.response.json();",
+              "pm.test('au moins une analyse', () => pm.expect(liste.length).to.be.above(0));",
+              "pm.test('resume sans correspondances', () => pm.expect(liste[0].correspondances).to.be.an('array').that.is.empty);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Rapports du projet",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/projets/{{projetId}}/similarites",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "projets", "{{projetId}}", "similarites"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('les deux analyses remontent', () => pm.expect(pm.response.json().length).to.be.at.least(2));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Cas a examiner (encadrant)",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/similarites/a-examiner",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "similarites", "a-examiner"]
+        },
+        "description": "Niveaux ATTENTION et SUSPECT seulement, tries par score decroissant. Point d'entree de la vue encadrant (6.7). Peut etre vide si aucun score n'atteint le seuil d'attention : ce n'est pas un echec, c'est une information sur le calibrage."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const liste = pm.response.json();",
+              "console.log('A EXAMINER :', liste.length, 'cas');",
+              "liste.forEach(r => console.log('  ', r.documentNom, '->', r.niveau, r.scoreMax));",
+              "pm.test('aucun cas de niveau AUCUN dans cette liste', () => pm.expect(liste.every(r => r.niveau !== 'AUCUN')).to.be.true);",
+              "pm.test('tri par score decroissant', () => { for (let i = 1; i < liste.length; i++) { pm.expect(liste[i-1].scoreMax).to.be.at.least(liste[i].scoreMax); } });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. CALIBRAGE : le plagiat doit ressortir au-dessus du bruit",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/similarites/{{rapportIdB}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "similarites", "{{rapportIdB}}"]
+        },
+        "description": "Requete centrale de l'etape 6.6. Elle ne verifie pas un seuil absolu, mais l'ecart entre le cas de plagiat (B) et le controle negatif (C). C'est cet ecart qui indique ou placer la barre : un seuil doit tomber entre les deux valeurs. Lire la console."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const b = Number(pm.collectionVariables.get('scoreB'));",
+              "const c = Number(pm.collectionVariables.get('scoreC'));",
+              "const r = pm.response.json();",
+              "console.log('=========== CALIBRAGE DES SEUILS ===========');",
+              "console.log('B (4 sections recopiees de A) :', b);",
+              "console.log('C (aucun lien avec A)         :', c);",
+              "console.log('ecart                          :', (b - c).toFixed(4));",
+              "console.log('seuils actuels : suspect', r.seuilSuspect, '| attention', r.seuilAttention);",
+              "console.log('--> placer similarite.seuil.suspect entre les deux valeurs,');",
+              "console.log('    plus pres de B que de C.');",
+              "console.log('============================================');",
+              "pm.test('le plagiat score plus haut que le controle negatif', () => pm.expect(b).to.be.above(c));",
+              "pm.test('ecart significatif (au moins 0,05)', () => pm.expect(b - c).to.be.above(0.05));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Analyser un document archive (autorise)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/documents/{{documentIdA}}/similarite",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "documents", "{{documentIdA}}", "similarite"]
+        },
+        "description": "Choix assume : analyser une archive est permis, ce qui sert a verifier qu'un rapport de reference n'est pas lui-meme une copie. Le document est exclu de sa propre comparaison par le filtre d.id <> :documentExclu, donc aucun score de 1 artificiel."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('201 Created (analyse d une archive autorisee)', () => pm.response.to.have.status(201));",
+              "const r = pm.response.json();",
+              "console.log('ARCHIVE A analysee : score', r.scoreMax, '| niveau', r.niveau);",
+              "pm.test('pas de score parfait contre soi-meme', () => pm.expect(r.scoreMax).to.be.below(0.999));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14. Login etudiant",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"yassine.alami@pfe.local\",\n  \"motDePasse\": \"REMPLACER_PAR_TON_MOT_DE_PASSE\"\n}" },
+        "description": "Compte etudiant chef d'equipe. Renseigner le mot de passe que tu utilises deja pour te connecter au frontend avec ce compte. Les requetes 15 et 16 verifient qu'un etudiant n'accede pas aux rapports de similarite."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set('tokenEtudiant', pm.response.json().accessToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15. Etudiant : consultation refusee -> 403",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/documents/{{documentIdB}}/similarite",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "documents", "{{documentIdB}}", "similarite"]
+        },
+        "description": "L'etudiant n'accede a aucun rapport, meme sur son propre document : pouvoir lire son score lui permettrait de retoucher son texte jusqu'a passer sous le seuil."
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden', () => pm.response.to.have.status(403));"] } }
+      ]
+    },
+    {
+      "name": "16. Etudiant : declenchement refuse -> 403",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/documents/{{documentIdB}}/similarite",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "documents", "{{documentIdB}}", "similarite"]
+        }
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden', () => pm.response.to.have.status(403));"] } }
+      ]
+    },
+    {
+      "name": "17. Sans jeton -> 401",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/documents/{{documentIdB}}/similarite",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "documents", "{{documentIdB}}", "similarite"]
+        }
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] } }
+      ]
+    },
+    {
+      "name": "18. Document sans analyse -> 404",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/documents/999999/similarite",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "documents", "999999", "similarite"]
+        }
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] } }
+      ]
+    },
+    {
+      "name": "19. Rapport inexistant -> 404",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/similarites/999999",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "similarites", "999999"]
+        }
+      },
+      "event": [
+        { "listen": "test", "script": { "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] } }
+      ]
+    }
+  ]
+}

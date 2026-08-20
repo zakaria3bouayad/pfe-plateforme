@@ -31,4 +31,9 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
     Optional<Document> findByCheminMinio(String cheminMinio);
 
     long countByProjetIdAndSupprimeFalse(Long projetId);
+
+    /** Corpus de reference du lot 6 : documents marques comme archives et non supprimes, du plus recemment archive au plus ancien. */
+    List<Document> findByArchiveTrueAndSupprimeFalseOrderByDateArchivageDesc();
+
+    long countByArchiveTrueAndSupprimeFalse();
 }

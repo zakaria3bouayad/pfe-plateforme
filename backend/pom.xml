@@ -16,6 +16,7 @@
 	<properties>
 		<java.version>21</java.version>
 		<jjwt.version>0.13.0</jjwt.version>
+		<pdfbox.version>3.0.8</pdfbox.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -104,6 +105,29 @@
 			<groupId>com.squareup.okhttp3</groupId>
 			<artifactId>okhttp</artifactId>
 			<version>4.12.0</version>
+		</dependency>
+		<!-- ========================================================= -->
+		<!-- ============= Apache PDFBox (Lot 6, etape 6.2) ============= -->
+		<!-- Extraction de la couche texte des rapports PDF archives, en
+		     entree du calcul d'embeddings (etape 6.3). Pas d'OCR : un PDF
+		     scanne sans couche texte ressort vide, cas trace explicitement
+		     par le statut VIDE de l'indexation. -->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>${pdfbox.version}</version>
+		</dependency>
+		<!-- ========================================================= -->
+		<!-- ========= Hibernate vector (Lot 6, etape 6.3) ========= -->
+		<!-- Mappe le type pgvector sur un float[] Java via
+		     @JdbcTypeCode(SqlTypes.VECTOR). Sans ce module, Hibernate ne sait
+		     ni generer ni lire une colonne vector(768). Version alignee sur
+		     hibernate-core, dont la propriete est fournie par le BOM Spring
+		     Boot : aucun risque de desynchronisation. -->
+		<dependency>
+			<groupId>org.hibernate.orm</groupId>
+			<artifactId>hibernate-vector</artifactId>
+			<version>${hibernate.version}</version>
 		</dependency>
 		<!-- ========================================================= -->
 		<dependency>
