@@ -12,6 +12,7 @@ const cartes = [
   { titre: 'Discussions', icone: 'mdi-forum-outline', route: '/encadrant/messagerie' },
   { titre: 'Bibliothèque', icone: 'mdi-library-outline', route: '/bibliotheque' },
   { titre: 'Rapports de similarité', icone: 'mdi-file-compare', route: '/encadrant/similarite' },
+  { titre: 'Notifications', icone: 'mdi-bell-outline', route: '/notifications' },
 ]
 </script>
 

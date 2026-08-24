@@ -1,0 +1,388 @@
+{
+  "info": {
+    "name": "PFE - Lot 7 Bloc A - Notifications (etapes 7.1 a 7.5)",
+    "description": "Collection de test pour NotificationController : creation in-app declenchee par les evenements metier branches a l'etape 7.4, consultation, marquage lu / tout marquer lu, et isolation entre comptes (chacun n'accede qu'aux siennes). Executer les dossiers dans l'ordre.\n\nComptes utilises :\n- Encadrant : karim.benali@pfe.local / Encadrant@2026\n- Etudiant : yassine.alami@pfe.local / Etudiant@2026\n- Admin : admin@pfe.local / Admin@2026\n\nLes deux sujets de test sont crees par la collection elle-meme (titre suffixe par {{$timestamp}}) : aucun identifiant existant a renseigner, la collection est rejouable telle quelle.\n\nLe declenchement d'un mail (SUJET_VALIDE et SUJET_REJETE sont tous deux dans la liste courte des mails, decision assumee a l'etape 7.4) n'est pas verifie ici : Postman n'a pas acces a la boite MailHog. Verifier manuellement sur http://localhost:8025 apres les dossiers 1 et 2 si besoin.\n\nPrerequis : docker compose up -d (le conteneur mailhog doit tourner, sinon l'envoi de mail echoue silencieusement cote MailService - ca ne bloque pas la notification in-app, qui est persistee avant l'appel au mail).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" },
+    { "key": "tokenEncadrant", "value": "" },
+    { "key": "tokenEtudiant", "value": "" },
+    { "key": "tokenAdmin", "value": "" },
+    { "key": "sujetIdValide", "value": "" },
+    { "key": "sujetIdRejete", "value": "" },
+    { "key": "notifIdValide", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Auth",
+      "item": [
+        {
+          "name": "Login encadrant (karim.benali)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"karim.benali@pfe.local\",\n  \"motDePasse\": \"Encadrant@2026\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenEncadrant', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login etudiant (yassine.alami)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"yassine.alami@pfe.local\",\n  \"motDePasse\": \"Etudiant@2026\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenEtudiant', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login admin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@pfe.local\",\n  \"motDePasse\": \"Admin@2026\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenAdmin', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Evenement SUJET_VALIDE -> notification + mail",
+      "item": [
+        {
+          "name": "1.1 Proposer un sujet (encadrant) -> capture sujetIdValide",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/sujets", "host": ["{{baseUrl}}"], "path": ["api", "sujets"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titre\": \"Sujet notif valide {{$timestamp}}\",\n  \"description\": \"Sujet cree par la collection Postman Lot 7 Bloc A pour declencher une notification SUJET_VALIDE.\",\n  \"motsCles\": \"test,lot7\",\n  \"capaciteMax\": 2\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json();",
+                  "pm.test('statut PROPOSE', () => pm.expect(d.statut).to.eql('PROPOSE'));",
+                  "pm.collectionVariables.set('sujetIdValide', d.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.2 Demarrer la validation (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/sujets/{{sujetIdValide}}/demarrer-validation",
+              "host": ["{{baseUrl}}"], "path": ["api", "sujets", "{{sujetIdValide}}", "demarrer-validation"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('statut EN_VALIDATION', () => pm.expect(pm.response.json().statut).to.eql('EN_VALIDATION'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.3 Valider le sujet (admin) -> declenche notification + mail",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/sujets/{{sujetIdValide}}/valider",
+              "host": ["{{baseUrl}}"], "path": ["api", "sujets", "{{sujetIdValide}}", "valider"]
+            },
+            "description": "SujetService.valider (etape 7.4) cree la notification SUJET_VALIDE pour l'encadrant proprietaire ET envoie un mail (liste courte assumee). Verifier le mail sur http://localhost:8025 si besoin - non teste ici."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('statut VALIDE', () => pm.expect(pm.response.json().statut).to.eql('VALIDE'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.4 Notifications de l'encadrant -> SUJET_VALIDE presente et non lue",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/notifications", "host": ["{{baseUrl}}"], "path": ["api", "notifications"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const sujetId = Number(pm.collectionVariables.get('sujetIdValide'));",
+                  "const notifs = pm.response.json();",
+                  "const notif = notifs.find(n => n.type === 'SUJET_VALIDE' && n.lien === '/sujets/' + sujetId);",
+                  "pm.test('notification SUJET_VALIDE trouvee', () => pm.expect(notif).to.not.be.undefined);",
+                  "pm.test('non lue a la creation', () => pm.expect(notif.lue).to.be.false);",
+                  "if (notif) pm.collectionVariables.set('notifIdValide', notif.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.5 Compteur de non lues (encadrant) -> superieur a zero",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/notifications/compteur", "host": ["{{baseUrl}}"], "path": ["api", "notifications", "compteur"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('au moins une non lue', () => pm.expect(pm.response.json()).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.6 Marquer la notification SUJET_VALIDE comme lue",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/{{notifIdValide}}/lu",
+              "host": ["{{baseUrl}}"], "path": ["api", "notifications", "{{notifIdValide}}", "lu"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('lue = true', () => pm.expect(pm.response.json().lue).to.be.true);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Evenement SUJET_REJETE -> notification + mail",
+      "item": [
+        {
+          "name": "2.1 Proposer un second sujet (encadrant) -> capture sujetIdRejete",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/sujets", "host": ["{{baseUrl}}"], "path": ["api", "sujets"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titre\": \"Sujet notif rejete {{$timestamp}}\",\n  \"description\": \"Sujet cree par la collection Postman Lot 7 Bloc A pour declencher une notification SUJET_REJETE.\",\n  \"motsCles\": \"test,lot7\",\n  \"capaciteMax\": 2\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('sujetIdRejete', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.2 Demarrer la validation (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/sujets/{{sujetIdRejete}}/demarrer-validation",
+              "host": ["{{baseUrl}}"], "path": ["api", "sujets", "{{sujetIdRejete}}", "demarrer-validation"]
+            }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }
+          ]
+        },
+        {
+          "name": "2.3 Rejeter avec commentaire (admin) -> declenche notification + mail",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sujets/{{sujetIdRejete}}/rejeter",
+              "host": ["{{baseUrl}}"], "path": ["api", "sujets", "{{sujetIdRejete}}", "rejeter"]
+            },
+            "body": { "mode": "raw", "raw": "{\n  \"commentaire\": \"Description insuffisante, a preciser.\"\n}" },
+            "description": "SujetService.rejeter exige un commentaire (exigerCommentaire) : un corps sans champ commentaire renverrait 400."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('statut REJETE', () => pm.expect(pm.response.json().statut).to.eql('REJETE'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.4 Notifications de l'encadrant -> SUJET_REJETE presente avec le commentaire",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/notifications", "host": ["{{baseUrl}}"], "path": ["api", "notifications"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const sujetId = Number(pm.collectionVariables.get('sujetIdRejete'));",
+                  "const notif = pm.response.json().find(n => n.type === 'SUJET_REJETE' && n.lien === '/sujets/' + sujetId);",
+                  "pm.test('notification SUJET_REJETE trouvee', () => pm.expect(notif).to.not.be.undefined);",
+                  "pm.test('message contient le commentaire', () => pm.expect(notif.message).to.include('Description insuffisante'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Isolation entre comptes",
+      "item": [
+        {
+          "name": "3.1 Notifications de l'etudiant -> ne contiennent pas celles de l'encadrant",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/notifications", "host": ["{{baseUrl}}"], "path": ["api", "notifications"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const notifIdValide = Number(pm.collectionVariables.get('notifIdValide'));",
+                  "const idsEtudiant = pm.response.json().map(n => n.id);",
+                  "pm.test('la notification de l encadrant n y figure pas', () => pm.expect(idsEtudiant).to.not.include(notifIdValide));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.2 Marquer lue la notification d'autrui (etudiant) -> 400, jamais 403/404 revelateur",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/{{notifIdValide}}/lu",
+              "host": ["{{baseUrl}}"], "path": ["api", "notifications", "{{notifIdValide}}", "lu"]
+            },
+            "description": "NotificationService.marquerLu traite une notification qui n'appartient pas a l'appelant comme introuvable (jamais interdite), pour ne rien laisser deviner sur l'existence des notifications d'autrui.\n\nA noter : le code leve `new BusinessException(\"Notification introuvable\")` sans passer par la fabrique `BusinessException.introuvable(...)`, donc le statut reellement renvoye est 400 (constructeur par defaut de BusinessException), pas 404 malgre l'intention decrite en commentaire. Comportement actuel teste tel quel, pas corrige ici."
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('400 Bad Request', () => pm.response.to.have.status(400));"] } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Tout marquer lu",
+      "item": [
+        {
+          "name": "4.1 Tout marquer lu (encadrant)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/notifications/lu", "host": ["{{baseUrl}}"], "path": ["api", "notifications", "lu"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"] } }
+          ]
+        },
+        {
+          "name": "4.2 Compteur de non lues (encadrant) -> zero",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/notifications/compteur", "host": ["{{baseUrl}}"], "path": ["api", "notifications", "compteur"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));", "pm.test('compteur a zero', () => pm.expect(pm.response.json()).to.eql(0));"] } }
+          ]
+        }
+      ]
+    }
+  ]
+}

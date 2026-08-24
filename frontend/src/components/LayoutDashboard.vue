@@ -1,6 +1,7 @@
 <script setup>
 import { useAuthStore } from '@/stores/authStore'
 import { useRouter } from 'vue-router'
+import NotificationCloche from '@/components/NotificationCloche.vue'
 
 defineProps({
   titre: { type: String, required: true },
@@ -25,7 +26,8 @@ function seDeconnecter() {
     </v-app-bar-title>
 
     <template #append>
-      <span class="text-body-2 mr-4 d-none d-sm-inline">{{ auth.nomComplet }}</span>
+      <span class="text-body-2 mr-2 d-none d-sm-inline">{{ auth.nomComplet }}</span>
+      <NotificationCloche />
       <v-btn icon="mdi-logout" variant="text" title="Se déconnecter" @click="seDeconnecter" />
     </template>
   </v-app-bar>

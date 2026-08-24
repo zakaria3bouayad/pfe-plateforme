@@ -148,11 +148,29 @@ const routes = [
     component: () => import('@/views/AdminArchivesView.vue'),
     meta: { roles: ['ADMINISTRATEUR'] },
   },
+  {
+    // Lot 7, etape 7.12. Consultation du journal d'audit (AuditController,
+    // etape 7.9) - reservee a l'administrateur, comme cote serveur.
+    path: '/admin/audit',
+    name: 'admin-audit',
+    component: () => import('@/views/AdminAuditView.vue'),
+    meta: { roles: ['ADMINISTRATEUR'] },
+  },
 
   {
     path: '/bibliotheque',
     name: 'bibliotheque',
     component: () => import('@/views/BibliothequeView.vue'),
+    meta: { roles: ['ETUDIANT', 'ENCADRANT', 'ADMINISTRATEUR'] },
+  },
+
+  {
+    // Lot 7, etape 7.11. Ouverte a tout compte authentifie, meme regle que
+    // NotificationController : chacun n'y voit jamais que ses propres
+    // notifications, quel que soit son role.
+    path: '/notifications',
+    name: 'notifications',
+    component: () => import('@/views/NotificationsView.vue'),
     meta: { roles: ['ETUDIANT', 'ENCADRANT', 'ADMINISTRATEUR'] },
   },
 

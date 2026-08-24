@@ -12,6 +12,7 @@ const cartes = [
   { titre: 'Documents', icone: 'mdi-file-document-outline', route: '/etudiant/documents' },
   { titre: 'Messagerie', icone: 'mdi-forum-outline', route: '/etudiant/messagerie' },
   { titre: 'Bibliothèque', icone: 'mdi-library-outline', route: '/bibliotheque' },
+  { titre: 'Notifications', icone: 'mdi-bell-outline', route: '/notifications' },
 ]
 </script>
 

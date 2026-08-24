@@ -23,6 +23,21 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
+		<!-- AOP (Lot 7, etape 7.7) : @Audite / AuditAspect, journal d'audit par
+		     annotation explicite plutot qu'un aspect sur tous les controleurs
+		     (decision assumee).
+		     Version fixee explicitement : spring-boot-starter-parent 4.1.0 ne
+		     gere pas la version de cet artefact dans son dependencyManagement
+		     (lacune connue de cette ligne de version de Spring Boot, cf. issues
+		     spring-projects/spring-boot #48380 et #49266) - sans quoi Maven
+		     refuse de resoudre la dependance ("version is missing"). Alignee
+		     sur la version du parent, comme tous les modules Spring Boot d'une
+		     meme release. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-aop</artifactId>
+			<version>${project.parent.version}</version>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>

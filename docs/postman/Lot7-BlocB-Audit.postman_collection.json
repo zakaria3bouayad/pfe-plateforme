@@ -1,0 +1,636 @@
+{
+  "info": {
+    "name": "PFE - Lot 7 Bloc B - Journal d'audit (etapes 7.6 a 7.9)",
+    "description": "Collection de test pour AuditController : controle d'acces (reserve ADMINISTRATEUR), pagination par defaut, filtres combinables, et verification que les 7 points d'ancrage @Audite de l'etape 7.8 ecrivent bien une entree.\n\nComptes utilises :\n- Admin : admin@pfe.local / Admin@2026\n- Encadrant : karim.benali@pfe.local / Encadrant@2026\n- Etudiant : yassine.alami@pfe.local / Etudiant@2026\n\nLes dossiers 0 a 3 sont autonomes (les sujets de test sont crees par la collection elle-meme, titre suffixe {{$timestamp}}) et couvrent CONNEXION, CONNEXION_ECHEC, SUJET_VALIDE, SUJET_REJETE. Le dossier 4 couvre les 3 points d'ancrage restants (DOCUMENT_ARCHIVE_STATUT_MODIFIE, DOCUMENT_SUPPRIME, SIMILARITE_ANALYSEE, COMPTE_STATUT_MODIFIE) mais exige des identifiants reels de votre base (variables documentId / utilisateurCibleId ci-dessous) - a executer separement, dossier par dossier.\n\nPour trouver un documentId exploitable :\n  docker exec pfe-db psql -U pfe -d pfe_db -c \"SELECT id, nom, type FROM document WHERE supprime = false;\"\nPour utilisateurCibleId, choisir un compte AUTRE QUE celui utilise pour se connecter (ne pas se desactiver soi-meme) :\n  docker exec pfe-db psql -U pfe -d pfe_db -c \"SELECT id, email, role, actif FROM utilisateur;\"\n\nPrerequis : docker compose up -d. Les requetes marquees LENT declenchent extraction + vectorisation (jusqu'a 1-2 minutes) - ne pas annuler.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" },
+    { "key": "tokenAdmin", "value": "" },
+    { "key": "tokenEncadrant", "value": "" },
+    { "key": "tokenEtudiant", "value": "" },
+    { "key": "sujetIdValide", "value": "" },
+    { "key": "sujetIdRejete", "value": "" },
+    { "key": "documentId", "value": "1" },
+    { "key": "utilisateurCibleId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Auth",
+      "item": [
+        {
+          "name": "Login admin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@pfe.local\",\n  \"motDePasse\": \"Admin@2026\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenAdmin', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login encadrant (karim.benali)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"karim.benali@pfe.local\",\n  \"motDePasse\": \"Encadrant@2026\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenEncadrant', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login etudiant (yassine.alami)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"yassine.alami@pfe.local\",\n  \"motDePasse\": \"Etudiant@2026\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenEtudiant', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Controle d'acces au journal",
+      "item": [
+        {
+          "name": "1.1 Sans jeton -> 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/admin/audit", "host": ["{{baseUrl}}"], "path": ["api", "admin", "audit"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] } }
+          ]
+        },
+        {
+          "name": "1.2 Jeton etudiant -> 403",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEtudiant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/admin/audit", "host": ["{{baseUrl}}"], "path": ["api", "admin", "audit"] }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden', () => pm.response.to.have.status(403));"] } }
+          ]
+        },
+        {
+          "name": "1.3 Jeton encadrant -> 403",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": { "raw": "{{baseUrl}}/api/admin/audit", "host": ["{{baseUrl}}"], "path": ["api", "admin", "audit"] },
+            "description": "Reserve a l'administrateur : le prefixe /api/admin est verrouille par SecurityConfig, @PreAuthorize sur AuditController est la seconde barriere."
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('403 Forbidden', () => pm.response.to.have.status(403));"] } }
+          ]
+        },
+        {
+          "name": "1.4 Jeton admin -> 200, pagination par defaut (taille 20, tri horodatage desc)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": { "raw": "{{baseUrl}}/api/admin/audit", "host": ["{{baseUrl}}"], "path": ["api", "admin", "audit"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test('reponse paginee (content, totalElements, size)', () => {",
+                  "  pm.expect(p.content).to.be.an('array');",
+                  "  pm.expect(p.totalElements).to.be.a('number');",
+                  "  pm.expect(p.size).to.eql(20);",
+                  "});",
+                  "if (p.content.length >= 2) {",
+                  "  pm.test('trie par horodatage decroissant', () => {",
+                  "    pm.expect(new Date(p.content[0].horodatage).getTime()).to.be.at.least(new Date(p.content[1].horodatage).getTime());",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Connexion / connexion echouee",
+      "item": [
+        {
+          "name": "2.1 Connexion avec mauvais mot de passe (admin) -> 401, CONNEXION_ECHEC journalise",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@pfe.local\",\n  \"motDePasse\": \"MotDePasseDeliberementFaux\"\n}" },
+            "description": "AuthService.connecter leve BadCredentialsException (401). AuditAspect intercepte l'echec via @Around et journalise CONNEXION_ECHEC, acteur = l'email fourni (pas encore de contexte authentifie a ce stade)."
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] } }
+          ]
+        },
+        {
+          "name": "2.2 Journal -> CONNEXION_ECHEC present pour admin@pfe.local",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/audit?action=CONNEXION_ECHEC&acteur=admin@pfe.local",
+              "host": ["{{baseUrl}}"], "path": ["api", "admin", "audit"],
+              "query": [
+                { "key": "action", "value": "CONNEXION_ECHEC" },
+                { "key": "acteur", "value": "admin@pfe.local" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test('au moins une entree CONNEXION_ECHEC pour admin@pfe.local', () => pm.expect(p.totalElements).to.be.above(0));",
+                  "pm.test('toutes les entrees correspondent au filtre action', () => pm.expect(p.content.every(e => e.action === 'CONNEXION_ECHEC')).to.be.true);",
+                  "pm.test('detail porte le message d erreur', () => pm.expect(p.content[0].detail).to.eql('Identifiants invalides'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.3 Journal -> CONNEXION present pour admin@pfe.local (login reussi du dossier 0)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/audit?action=CONNEXION&acteur=admin@pfe.local",
+              "host": ["{{baseUrl}}"], "path": ["api", "admin", "audit"],
+              "query": [
+                { "key": "action", "value": "CONNEXION" },
+                { "key": "acteur", "value": "admin@pfe.local" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test('au moins une connexion reussie journalisee', () => pm.expect(p.totalElements).to.be.above(0));",
+                  "pm.test('detail absent sur un succes', () => pm.expect(p.content[0].detail).to.be.null);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Sujets valide/rejete -> entrees d'audit",
+      "item": [
+        {
+          "name": "3.1 Proposer un sujet (encadrant) -> capture sujetIdValide",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/sujets", "host": ["{{baseUrl}}"], "path": ["api", "sujets"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titre\": \"Sujet audit valide {{$timestamp}}\",\n  \"description\": \"Sujet cree par la collection Postman Lot 7 Bloc B pour verifier l'entree SUJET_VALIDE.\",\n  \"motsCles\": \"test,lot7\",\n  \"capaciteMax\": 2\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) { pm.collectionVariables.set('sujetIdValide', pm.response.json().id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.2 Demarrer puis valider (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/sujets/{{sujetIdValide}}/demarrer-validation",
+              "host": ["{{baseUrl}}"], "path": ["api", "sujets", "{{sujetIdValide}}", "demarrer-validation"]
+            }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }
+          ]
+        },
+        {
+          "name": "3.3 Valider (admin) -> declenche SUJET_VALIDE",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/sujets/{{sujetIdValide}}/valider",
+              "host": ["{{baseUrl}}"], "path": ["api", "sujets", "{{sujetIdValide}}", "valider"]
+            }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }
+          ]
+        },
+        {
+          "name": "3.4 Journal -> SUJET_VALIDE avec la bonne cible",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/audit?action=SUJET_VALIDE",
+              "host": ["{{baseUrl}}"], "path": ["api", "admin", "audit"],
+              "query": [{ "key": "action", "value": "SUJET_VALIDE" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const sujetId = Number(pm.collectionVariables.get('sujetIdValide'));",
+                  "const p = pm.response.json();",
+                  "const entree = p.content.find(e => e.cible === 'Sujet#' + sujetId);",
+                  "pm.test('entree SUJET_VALIDE trouvee pour ce sujet', () => pm.expect(entree).to.not.be.undefined);",
+                  "pm.test('acteur = admin (SecurityContextHolder, pas d acteur explicite)', () => pm.expect(entree.acteur).to.eql('admin@pfe.local'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.5 Proposer un second sujet (encadrant) -> capture sujetIdRejete",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/sujets", "host": ["{{baseUrl}}"], "path": ["api", "sujets"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titre\": \"Sujet audit rejete {{$timestamp}}\",\n  \"description\": \"Sujet cree par la collection Postman Lot 7 Bloc B pour verifier l'entree SUJET_REJETE.\",\n  \"motsCles\": \"test,lot7\",\n  \"capaciteMax\": 2\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) { pm.collectionVariables.set('sujetIdRejete', pm.response.json().id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.6 Demarrer puis rejeter (admin) -> declenche SUJET_REJETE",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/sujets/{{sujetIdRejete}}/demarrer-validation",
+              "host": ["{{baseUrl}}"], "path": ["api", "sujets", "{{sujetIdRejete}}", "demarrer-validation"]
+            }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }
+          ]
+        },
+        {
+          "name": "3.7 Rejeter avec commentaire (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sujets/{{sujetIdRejete}}/rejeter",
+              "host": ["{{baseUrl}}"], "path": ["api", "sujets", "{{sujetIdRejete}}", "rejeter"]
+            },
+            "body": { "mode": "raw", "raw": "{\n  \"commentaire\": \"Perimetre trop large pour un PFE.\"\n}" }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }
+          ]
+        },
+        {
+          "name": "3.8 Journal -> SUJET_REJETE avec le commentaire en detail",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/audit?action=SUJET_REJETE",
+              "host": ["{{baseUrl}}"], "path": ["api", "admin", "audit"],
+              "query": [{ "key": "action", "value": "SUJET_REJETE" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const sujetId = Number(pm.collectionVariables.get('sujetIdRejete'));",
+                  "const entree = pm.response.json().content.find(e => e.cible === 'Sujet#' + sujetId);",
+                  "pm.test('entree SUJET_REJETE trouvee', () => pm.expect(entree).to.not.be.undefined);",
+                  "pm.test('detail = le commentaire de rejet', () => pm.expect(entree.detail).to.eql('Perimetre trop large pour un PFE.'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.9 Filtres combines : acteur partiel + plage de dates (aujourd'hui)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/audit?acteur=admin&depuis={{$isoTimestamp}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "admin", "audit"],
+              "query": [
+                { "key": "acteur", "value": "admin" },
+                { "key": "depuis", "value": "{{$isoTimestamp}}" }
+              ]
+            },
+            "description": "acteur est une recherche partielle insensible a la casse (LIKE) : 'admin' doit suffire a matcher admin@pfe.local. depuis utilise ici un instant proche de l'execution (variable dynamique Postman {{$isoTimestamp}}) : ne doit remonter aucune entree, les evenements testes precedent cet appel."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test('tous les acteurs contiennent admin', () => pm.expect(p.content.every(e => e.acteur.toLowerCase().includes('admin'))).to.be.true);",
+                  "pm.test('rien de plus recent que maintenant', () => pm.expect(p.totalElements).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Couverture additionnelle (necessite documentId / utilisateurCibleId reels)",
+      "item": [
+        {
+          "name": "4.1 Marquer un document comme archive (admin) -> DOCUMENT_ARCHIVE_STATUT_MODIFIE - LENT, optionnel",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/documents/{{documentId}}/archive",
+              "host": ["{{baseUrl}}"], "path": ["api", "admin", "documents", "{{documentId}}", "archive"]
+            },
+            "body": { "mode": "raw", "raw": "{\n  \"archive\": true\n}" },
+            "description": "Declenche en plus extraction + vectorisation (Lot 6) : peut durer 1 a 2 minutes. Deja couvert fonctionnellement par Lot6-BlocA-Archivage-Indexation ; ici on ne verifie que l'entree d'audit."
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }
+          ]
+        },
+        {
+          "name": "4.2 Journal -> DOCUMENT_ARCHIVE_STATUT_MODIFIE present",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/audit?action=DOCUMENT_ARCHIVE_STATUT_MODIFIE",
+              "host": ["{{baseUrl}}"], "path": ["api", "admin", "audit"],
+              "query": [{ "key": "action", "value": "DOCUMENT_ARCHIVE_STATUT_MODIFIE" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const documentId = Number(pm.collectionVariables.get('documentId'));",
+                  "const entree = pm.response.json().content.find(e => e.cible === 'Document#' + documentId);",
+                  "pm.test('entree trouvee pour ce document', () => pm.expect(entree).to.not.be.undefined);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.3 Remettre le document a l'etat initial (demarquer)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/documents/{{documentId}}/archive",
+              "host": ["{{baseUrl}}"], "path": ["api", "admin", "documents", "{{documentId}}", "archive"]
+            },
+            "body": { "mode": "raw", "raw": "{\n  \"archive\": false\n}" },
+            "description": "Nettoyage : remet le document hors corpus pour ne pas fausser le Bloc B de Lot 6 si rejoue apres celui-ci."
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }
+          ]
+        },
+        {
+          "name": "4.4 Lancer une analyse de similarite (encadrant) -> SIMILARITE_ANALYSEE - LENT, optionnel",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/documents/{{documentId}}/similarite",
+              "host": ["{{baseUrl}}"], "path": ["api", "documents", "{{documentId}}", "similarite"]
+            },
+            "description": "Encadrant du projet requis (SimilariteController). Peut durer 1 a 2 minutes (extraction + appels Gemini)."
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('201 Created', () => pm.response.to.have.status(201));"] } }
+          ]
+        },
+        {
+          "name": "4.5 Journal -> SIMILARITE_ANALYSEE present",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/audit?action=SIMILARITE_ANALYSEE",
+              "host": ["{{baseUrl}}"], "path": ["api", "admin", "audit"],
+              "query": [{ "key": "action", "value": "SIMILARITE_ANALYSEE" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const documentId = Number(pm.collectionVariables.get('documentId'));",
+                  "const entree = pm.response.json().content.find(e => e.cible === 'Document#' + documentId);",
+                  "pm.test('entree trouvee pour ce document', () => pm.expect(entree).to.not.be.undefined);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.6 Activer/desactiver un compte (admin) -> COMPTE_STATUT_MODIFIE",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/utilisateurs/{{utilisateurCibleId}}/actif",
+              "host": ["{{baseUrl}}"], "path": ["api", "admin", "utilisateurs", "{{utilisateurCibleId}}", "actif"]
+            },
+            "body": { "mode": "raw", "raw": "{\n  \"actif\": false\n}" },
+            "description": "ATTENTION : utilisateurCibleId doit etre un compte autre que celui utilise pour se connecter, sinon on se desactive soi-meme. Pense a reactiver ensuite (requete 4.7)."
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));", "pm.test('actif = false', () => pm.expect(pm.response.json().actif).to.be.false);"] } }
+          ]
+        },
+        {
+          "name": "4.7 Reactiver le compte (nettoyage)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/utilisateurs/{{utilisateurCibleId}}/actif",
+              "host": ["{{baseUrl}}"], "path": ["api", "admin", "utilisateurs", "{{utilisateurCibleId}}", "actif"]
+            },
+            "body": { "mode": "raw", "raw": "{\n  \"actif\": true\n}" }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }
+          ]
+        },
+        {
+          "name": "4.8 Journal -> deux entrees COMPTE_STATUT_MODIFIE (desactivation puis reactivation)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/audit?action=COMPTE_STATUT_MODIFIE",
+              "host": ["{{baseUrl}}"], "path": ["api", "admin", "audit"],
+              "query": [{ "key": "action", "value": "COMPTE_STATUT_MODIFIE" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const utilisateurId = Number(pm.collectionVariables.get('utilisateurCibleId'));",
+                  "const entrees = pm.response.json().content.filter(e => e.cible === 'Utilisateur#' + utilisateurId);",
+                  "pm.test('au moins deux entrees pour ce compte', () => pm.expect(entrees.length).to.be.at.least(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.9 Supprimer un document (encadrant du projet) -> DOCUMENT_SUPPRIME - DESTRUCTIF, optionnel",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenEncadrant}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/documents/{{documentId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "documents", "{{documentId}}"]
+            },
+            "description": "DESTRUCTIF : supprime reellement le document {{documentId}} (suppression logique, DocumentService.supprimer). Ne pas executer sur un document dont on a encore besoin pour d'autres tests. Desactivee par defaut - a lancer volontairement."
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"] } }
+          ]
+        },
+        {
+          "name": "4.10 Journal -> DOCUMENT_SUPPRIME present",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/audit?action=DOCUMENT_SUPPRIME",
+              "host": ["{{baseUrl}}"], "path": ["api", "admin", "audit"],
+              "query": [{ "key": "action", "value": "DOCUMENT_SUPPRIME" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const documentId = Number(pm.collectionVariables.get('documentId'));",
+                  "const entree = pm.response.json().content.find(e => e.cible === 'Document#' + documentId);",
+                  "pm.test('entree trouvee pour ce document', () => pm.expect(entree).to.not.be.undefined);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
