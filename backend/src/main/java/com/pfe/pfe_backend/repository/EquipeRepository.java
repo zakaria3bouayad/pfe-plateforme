@@ -13,4 +13,8 @@ public interface EquipeRepository extends JpaRepository<Equipe, Long> {
     List<Equipe> findAllByOrderByDateCreationDesc();
 
     Optional<Equipe> findByChefId(Long chefId);
+
+    Optional<Equipe> findByCodeInvitation(String codeInvitation);
+
+    boolean existsByCodeInvitation(String codeInvitation);
 }

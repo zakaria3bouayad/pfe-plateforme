@@ -60,6 +60,14 @@ const routes = [
     meta: { roles: ['ETUDIANT'] },
   },
   {
+    // Lot 8, etape 8.12. Assistant conversationnel RAG (EF-48) : ouvert a
+    // tout etudiant, contrairement a la messagerie ci-dessus.
+    path: '/etudiant/assistant',
+    name: 'etudiant-assistant',
+    component: () => import('@/views/EtudiantAssistantView.vue'),
+    meta: { roles: ['ETUDIANT'] },
+  },
+  {
     path: '/encadrant',
     name: 'dashboard-encadrant',
     component: () => import('@/views/DashboardEncadrant.vue'),

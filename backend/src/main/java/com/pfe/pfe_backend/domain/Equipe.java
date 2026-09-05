@@ -48,6 +48,22 @@ public class Equipe {
             foreignKey = @ForeignKey(name = "fk_equipe_chef"))
     private Etudiant chef;
 
+    /**
+     * Code d'invitation (hors plan, ajoute a la demande de Zakaria en cours
+     * de lot 8) : remplace l'ancienne auto-inscription par liste ouverte -
+     * seul un etudiant muni du code donne par le chef peut rejoindre.
+     *
+     * Volontairement PAS nullable = false ici : sous ddl-auto=update, une
+     * colonne NOT NULL ajoutee par ALTER TABLE echoue des qu'une ligne
+     * existe deja sans valeur (l'equipe de test creee avant ce changement,
+     * par exemple). L'unicite et la non-nullite sont garanties par
+     * EquipeService (generation a la creation, retro-generation au premier
+     * chargement pour une equipe plus ancienne) ; la vraie contrainte NOT
+     * NULL sera posee dans une migration Flyway a part.
+     */
+    @Column(name = "code_invitation", unique = true, length = 8)
+    private String codeInvitation;
+
     @Column(name = "date_creation", nullable = false, updatable = false)
     private LocalDateTime dateCreation;
 

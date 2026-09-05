@@ -4,29 +4,33 @@ import LayoutDashboard from '@/components/LayoutDashboard.vue'
 import api, { messageErreur } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 
+/**
+ * Adhesion sur code d'invitation (hors plan, remplace en cours de lot 8
+ * l'ancienne liste ouverte de toutes les equipes rejoignables de la
+ * filiere/promotion, retiree a la demande de Zakaria) : le chef partage le
+ * code affiche sur la fiche de son equipe, l'etudiant le saisit ici pour
+ * rejoindre directement, sans parcourir de liste.
+ */
+
 const auth = useAuthStore()
 
 const equipe = ref(null)
-const equipesDisponibles = ref([])
 const chargement = ref(true)
 const erreur = ref(null)
 const succes = ref(null)
-const rejoindreEnCours = ref(null)
 
 const dialogueCreation = ref(false)
 const formulaireValide = ref(false)
 const f = ref({ nom: '', tailleMax: 3 })
 
 const numeroAjout = ref('')
+const codeRejoindre = ref('')
+const rejoindreEnCours = ref(false)
+const codeCopie = ref(false)
 
 const obligatoire = [(v) => !!v || 'Champ obligatoire']
 
 const estChef = computed(() => equipe.value && equipe.value.chefId === auth.utilisateur?.id)
-
-/** Equipes pas encore pleines : proposees pour l'auto-inscription (hors plan initial). */
-const equipesRejoignables = computed(() =>
-  equipesDisponibles.value.filter((e) => e.membres.length < e.tailleMax),
-)
 
 async function charger() {
   chargement.value = true
@@ -37,7 +41,6 @@ async function charger() {
   } catch (e) {
     if (e.response?.status === 404) {
       equipe.value = null
-      await chargerEquipesDisponibles()
     } else {
       erreur.value = messageErreur(e)
     }
@@ -46,30 +49,35 @@ async function charger() {
   }
 }
 
-async function chargerEquipesDisponibles() {
-  try {
-    const { data } = await api.get('/equipes')
-    equipesDisponibles.value = data
-  } catch (e) {
-    erreur.value = messageErreur(e)
-  }
-}
-
 onMounted(charger)
 
-async function rejoindre(equipeAJoindre) {
-  if (!confirm(`Rejoindre l'équipe « ${equipeAJoindre.nom} » ?`)) return
-  rejoindreEnCours.value = equipeAJoindre.id
+async function rejoindre() {
+  const code = codeRejoindre.value.trim()
+  if (!code) return
+
+  rejoindreEnCours.value = true
   erreur.value = null
   succes.value = null
   try {
-    await api.post(`/equipes/${equipeAJoindre.id}/rejoindre`)
-    succes.value = `Vous avez rejoint « ${equipeAJoindre.nom} ».`
+    const { data } = await api.post('/equipes/rejoindre', { code })
+    succes.value = `Vous avez rejoint « ${data.nom} ».`
+    codeRejoindre.value = ''
     await charger()
   } catch (e) {
     erreur.value = messageErreur(e)
   } finally {
-    rejoindreEnCours.value = null
+    rejoindreEnCours.value = false
+  }
+}
+
+async function copierCode() {
+  if (!equipe.value?.codeInvitation) return
+  try {
+    await navigator.clipboard.writeText(equipe.value.codeInvitation)
+    codeCopie.value = true
+    setTimeout(() => (codeCopie.value = false), 2000)
+  } catch {
+    // Copie manuelle possible via le champ affiche : pas bloquant si l'API clipboard est indisponible.
   }
 }
 
@@ -147,37 +155,25 @@ async function dissoudre() {
 
     <template v-if="!chargement && !equipe">
       <v-alert type="info" variant="tonal" class="mb-4">
-        Vous n'appartenez à aucune équipe pour l'instant. Créez-en une, ou rejoignez directement une
-        équipe existante ci-dessous (de votre filière et promotion, sous réserve de place disponible).
+        Vous n'appartenez à aucune équipe pour l'instant. Créez-en une, ou rejoignez celle d'un
+        camarade grâce au code que son chef vous a communiqué.
       </v-alert>
 
-      <v-alert v-if="equipesRejoignables.length === 0" type="info" variant="tonal" density="compact">
-        Aucune équipe avec de la place disponible pour l'instant.
-      </v-alert>
-
-      <v-list v-else density="comfortable" lines="two" class="mb-4">
-        <v-list-item
-          v-for="e in equipesRejoignables"
-          :key="e.id"
-          :title="e.nom"
-          :subtitle="`Chef : ${e.chefNom} · ${e.membres.length}/${e.tailleMax} membres`"
-        >
-          <template #prepend>
-            <v-icon icon="mdi-account-group-outline" />
-          </template>
-          <template #append>
-            <v-btn
-              size="small"
-              color="primary"
-              variant="tonal"
-              :loading="rejoindreEnCours === e.id"
-              @click="rejoindre(e)"
-            >
-              Rejoindre
-            </v-btn>
-          </template>
-        </v-list-item>
-      </v-list>
+      <v-card variant="outlined" rounded="lg">
+        <v-card-text class="d-flex align-end ga-2">
+          <v-text-field
+            v-model="codeRejoindre"
+            label="Code d'équipe"
+            variant="outlined"
+            density="comfortable"
+            hide-details
+            @keydown.enter="rejoindre"
+          />
+          <v-btn color="primary" :loading="rejoindreEnCours" :disabled="!codeRejoindre.trim()" @click="rejoindre">
+            Rejoindre
+          </v-btn>
+        </v-card-text>
+      </v-card>
     </template>
 
     <v-card v-if="equipe" variant="outlined" rounded="lg">
@@ -186,6 +182,18 @@ async function dissoudre() {
         <v-card-subtitle>Chef : {{ equipe.chefNom }} · Taille max : {{ equipe.tailleMax }}</v-card-subtitle>
       </v-card-item>
       <v-card-text>
+        <v-alert v-if="estChef" type="info" variant="tonal" density="compact" class="mb-4">
+          <div class="d-flex align-center justify-space-between flex-wrap ga-2">
+            <span>
+              Code à transmettre à vos camarades pour qu'ils rejoignent l'équipe :
+              <strong class="text-h6 ml-1">{{ equipe.codeInvitation }}</strong>
+            </span>
+            <v-btn size="small" variant="tonal" :prepend-icon="codeCopie ? 'mdi-check' : 'mdi-content-copy'" @click="copierCode">
+              {{ codeCopie ? 'Copié' : 'Copier' }}
+            </v-btn>
+          </div>
+        </v-alert>
+
         <v-list density="comfortable">
           <v-list-item v-for="m in equipe.membres" :key="m.id" :title="m.nomComplet" :subtitle="m.numeroEtudiant">
             <template #prepend>
@@ -199,7 +207,7 @@ async function dissoudre() {
 
         <template v-if="estChef">
           <v-divider class="my-4" />
-          <p class="text-subtitle-2 mb-2">Ajouter un membre</p>
+          <p class="text-subtitle-2 mb-2">Ajouter un membre par son numéro étudiant</p>
           <div class="d-flex ga-2">
             <v-text-field
               v-model="numeroAjout"

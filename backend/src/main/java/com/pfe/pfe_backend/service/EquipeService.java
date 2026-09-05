@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.util.List;
 
 /**
@@ -22,8 +23,9 @@ import java.util.List;
  * Le chef est celui qui a cree l'equipe ; il est seul habilite a en retirer
  * des membres, et ne peut la quitter que via dissoudre(). L'ajout d'un
  * membre peut venir soit du chef (ajouterMembre), soit du candidat
- * lui-meme (rejoindre, hors plan initial). L'affectation d'un sujet a une
- * equipe fait l'objet d'une etape ulterieure du lot 2.
+ * lui-meme muni du code d'invitation (rejoindreParCode, hors plan initial).
+ * L'affectation d'un sujet a une equipe fait l'objet d'une etape ulterieure
+ * du lot 2.
  */
 @Service
 @RequiredArgsConstructor
@@ -32,24 +34,37 @@ public class EquipeService {
     private final EquipeRepository equipeRepository;
     private final EtudiantRepository etudiantRepository;
 
+    /** Alphabet sans caracteres ambigus (pas de 0/O ni 1/I) pour un code lisible a l'oral. */
+    private static final String ALPHABET_CODE = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static final int LONGUEUR_CODE = 6;
+    private static final SecureRandom ALEA = new SecureRandom();
+
     @Transactional(readOnly = true)
     public List<EquipeDto> lister() {
         return equipeRepository.findAllByOrderByDateCreationDesc().stream()
-                .map(this::versDto).toList();
+                .map(this::versDtoSansCode).toList();
     }
 
     @Transactional(readOnly = true)
     public EquipeDto trouver(Long id) {
-        return versDto(trouverEntite(id));
+        return versDtoSansCode(trouverEntite(id));
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Equipe de l'etudiant connecte, code d'invitation inclus (etape
+     * consultee par le chef pour le transmettre). Pas readOnly : une equipe
+     * plus ancienne que ce changement peut encore avoir codeInvitation nul,
+     * et doit pouvoir etre corrigee ici (dirty-checking JPA) sans migration.
+     */
+    @Transactional
     public EquipeDto trouverParEtudiant(String email) {
         Etudiant etudiant = trouverEtudiant(email);
         if (etudiant.getEquipe() == null) {
             throw BusinessException.introuvable("Vous n'appartenez a aucune equipe");
         }
-        return versDto(etudiant.getEquipe());
+        Equipe equipe = etudiant.getEquipe();
+        garantirCodeInvitation(equipe);
+        return versDto(equipe);
     }
 
     @Transactional
@@ -64,6 +79,7 @@ public class EquipeService {
                 .nom(requete.nom().trim())
                 .tailleMax(requete.tailleMax())
                 .chef(chef)
+                .codeInvitation(genererCodeUnique())
                 .build();
         equipe = equipeRepository.save(equipe);
 
@@ -100,15 +116,19 @@ public class EquipeService {
     }
 
     /**
-     * Auto-inscription (hors plan, ajoute a la demande de Zakaria) : un
-     * etudiant sans equipe peut rejoindre lui-meme une equipe existante,
-     * sans passer par le chef. Memes regles metier que ajouterMembre (meme
-     * filiere/promotion que le chef, equipe pas pleine), initiees par le
-     * candidat plutot que par le chef.
+     * Adhesion sur code d'invitation (hors plan, remplace en cours de lot 8
+     * l'ancienne auto-inscription par liste ouverte de toutes les equipes
+     * de la filiere/promotion). Memes regles metier qu'avant : meme
+     * filiere/promotion que le chef, equipe pas pleine - seul le point
+     * d'entree change (un code au lieu de parcourir une liste).
      */
     @Transactional
-    public EquipeDto rejoindre(Long equipeId, String emailEtudiant) {
-        Equipe equipe = trouverEntite(equipeId);
+    public EquipeDto rejoindreParCode(String code, String emailEtudiant) {
+        String codeNormalise = code == null ? "" : code.trim().toUpperCase();
+
+        Equipe equipe = equipeRepository.findByCodeInvitation(codeNormalise)
+                .orElseThrow(() -> BusinessException.introuvable("Code d'equipe invalide"));
+
         Etudiant candidat = trouverEtudiant(emailEtudiant);
 
         if (candidat.getEquipe() != null) {
@@ -122,7 +142,7 @@ public class EquipeService {
                     "Vous devez etre de la meme filiere et de la meme promotion que cette equipe");
         }
 
-        if (etudiantRepository.countByEquipeId(equipeId) >= equipe.getTailleMax()) {
+        if (etudiantRepository.countByEquipeId(equipe.getId()) >= equipe.getTailleMax()) {
             throw BusinessException.conflit("Cette equipe a atteint sa taille maximale");
         }
 
@@ -193,7 +213,40 @@ public class EquipeService {
         }
     }
 
+    /** Retro-genere un code pour une equipe creee avant ce changement (cf. Javadoc de Equipe.codeInvitation). */
+    private void garantirCodeInvitation(Equipe equipe) {
+        if (equipe.getCodeInvitation() == null) {
+            equipe.setCodeInvitation(genererCodeUnique());
+        }
+    }
+
+    private String genererCodeUnique() {
+        String code;
+        do {
+            code = genererCode();
+        } while (equipeRepository.existsByCodeInvitation(code));
+        return code;
+    }
+
+    private String genererCode() {
+        StringBuilder code = new StringBuilder(LONGUEUR_CODE);
+        for (int i = 0; i < LONGUEUR_CODE; i++) {
+            code.append(ALPHABET_CODE.charAt(ALEA.nextInt(ALPHABET_CODE.length())));
+        }
+        return code.toString();
+    }
+
+    /** Vue complete, code d'invitation inclus - reservee au(x) membre(s) de l'equipe elle-meme. */
     private EquipeDto versDto(Equipe equipe) {
+        return construireDto(equipe, equipe.getCodeInvitation());
+    }
+
+    /** Vue pour les listings generaux (admin, recherche par id) : jamais le code, qui n'a de sens que pour l'equipe elle-meme. */
+    private EquipeDto versDtoSansCode(Equipe equipe) {
+        return construireDto(equipe, null);
+    }
+
+    private EquipeDto construireDto(Equipe equipe, String code) {
         List<MembreEquipeDto> membres = etudiantRepository.findByEquipeId(equipe.getId()).stream()
                 .map(e -> new MembreEquipeDto(e.getId(), e.getNomComplet(), e.getNumeroEtudiant()))
                 .toList();
@@ -204,6 +257,7 @@ public class EquipeService {
                 equipe.getTailleMax(),
                 equipe.getChef().getId(),
                 equipe.getChef().getNomComplet(),
+                code,
                 membres,
                 equipe.getDateCreation()
         );

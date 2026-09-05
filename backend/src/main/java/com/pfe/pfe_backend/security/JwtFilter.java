@@ -83,4 +83,22 @@ public class JwtFilter extends OncePerRequestFilter {
         String chemin = request.getServletPath();
         return CHEMINS_PUBLICS.contains(chemin) || chemin.startsWith("/actuator/");
     }
+
+    /**
+     * OncePerRequestFilter ne se re-execute jamais sur un dispatch ASYNC par
+     * defaut (shouldNotFilterAsyncDispatch() = true). Ca ne posait aucun
+     * probleme tant que rien n'utilisait de traitement asynchrone - mais
+     * ChatController (etape 8.8) renvoie un SseEmitter : quand celui-ci se
+     * termine (emitter.complete()), Tomcat effectue un dispatch ASYNC pour
+     * finaliser la reponse, qui retraverse toute la chaine de filtres. Sans
+     * ce filtre pour re-authentifier a cette etape, AuthorizationFilter (qui
+     * s'applique lui sur tous les types de dispatch) ne trouve plus
+     * d'Authentication et rejette avec AuthorizationDeniedException - une
+     * exception sans consequence pour le client (la reponse SSE est deja
+     * entierement envoyee a ce stade) mais qui polluait les logs.
+     */
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
+    }
 }

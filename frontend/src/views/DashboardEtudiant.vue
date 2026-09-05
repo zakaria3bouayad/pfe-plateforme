@@ -11,6 +11,7 @@ const cartes = [
   { titre: 'Mon équipe', icone: 'mdi-account-group-outline', route: '/etudiant/equipe' },
   { titre: 'Documents', icone: 'mdi-file-document-outline', route: '/etudiant/documents' },
   { titre: 'Messagerie', icone: 'mdi-forum-outline', route: '/etudiant/messagerie' },
+  { titre: 'Assistant', icone: 'mdi-robot-outline', route: '/etudiant/assistant' },
   { titre: 'Bibliothèque', icone: 'mdi-library-outline', route: '/bibliotheque' },
   { titre: 'Notifications', icone: 'mdi-bell-outline', route: '/notifications' },
 ]

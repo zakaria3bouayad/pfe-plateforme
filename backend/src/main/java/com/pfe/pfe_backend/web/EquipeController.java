@@ -3,6 +3,7 @@ package com.pfe.pfe_backend.web;
 import com.pfe.pfe_backend.dto.AjoutMembreRequest;
 import com.pfe.pfe_backend.dto.EquipeDto;
 import com.pfe.pfe_backend.dto.EquipeRequest;
+import com.pfe.pfe_backend.dto.RejoindreEquipeRequest;
 import com.pfe.pfe_backend.service.EquipeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,9 +20,10 @@ import java.util.List;
  *
  * Consultation ouverte a tout compte authentifie. Creation reservee a
  * l'etudiant chef d'equipe. Ajout d'un membre : par le chef (numero
- * etudiant) ou par le candidat lui-meme (auto-inscription, hors plan
- * initial) ; retrait reserve au chef. La dissolution peut aussi etre faite
- * par un administrateur.
+ * etudiant) ou par le candidat lui-meme muni du code d'invitation
+ * (rejoindreParCode, hors plan initial, remplace en cours de lot 8 l'ancienne
+ * auto-inscription par liste ouverte) ; retrait reserve au chef. La
+ * dissolution peut aussi etre faite par un administrateur.
  */
 @RestController
 @RequestMapping("/api/equipes")
@@ -64,11 +66,16 @@ public class EquipeController {
         return ResponseEntity.ok(equipeService.ajouterMembre(id, authentication.getName(), requete));
     }
 
-    /** Auto-inscription : un etudiant sans equipe rejoint lui-meme une equipe existante (hors plan initial). */
-    @PostMapping("/{id}/rejoindre")
+    /**
+     * Adhesion sur code d'invitation (hors plan, remplace en cours de lot 8
+     * l'ancienne auto-inscription par liste ouverte de toutes les equipes
+     * rejoignables). Pas de {id} dans l'URL : le code identifie l'equipe.
+     */
+    @PostMapping("/rejoindre")
     @PreAuthorize("hasRole('ETUDIANT')")
-    public ResponseEntity<EquipeDto> rejoindre(@PathVariable Long id, Authentication authentication) {
-        return ResponseEntity.ok(equipeService.rejoindre(id, authentication.getName()));
+    public ResponseEntity<EquipeDto> rejoindre(
+            Authentication authentication, @Valid @RequestBody RejoindreEquipeRequest requete) {
+        return ResponseEntity.ok(equipeService.rejoindreParCode(requete.code(), authentication.getName()));
     }
 
     /** Le membre connecte quitte l'equipe (le chef doit dissoudre plutot que quitter). */
